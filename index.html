@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E1116">
+<title>Parte de servicio</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%230E1116'/><rect x='30' y='20' width='14' height='60' rx='4' fill='%23FFB020'/><rect x='56' y='20' width='14' height='60' rx='4' fill='%23FFB020' opacity='.45'/></svg>">
+<style>
+:root{
+  --fondo:#0E1116; --panel:#161C24; --linea:#28313D;
+  --texto:#E8EAED; --apagado:#8B96A5;
+  --ambar:#FFB020; --ambar-osc:#8a5b00;
+  --ok:#3FB950; --rojo:#F0564A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  min-height:100vh;background:var(--fondo);color:var(--texto);
+  font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+.app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+header.cab{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:16px 18px;border-bottom:1px solid var(--linea);
+}
+.marca{display:flex;gap:12px;align-items:center}
+.chapa{
+  width:14px;height:34px;border-radius:3px;
+  background:repeating-linear-gradient(-45deg,var(--ambar) 0 6px,#141922 6px 12px);
+}
+h1{font-size:17px;font-weight:700;letter-spacing:.02em}
+.sub{font-size:12px;color:var(--apagado)}
+.reloj{
+  font-family:ui-monospace,'Cascadia Mono',Menlo,monospace;
+  font-size:15px;color:var(--ambar);letter-spacing:.08em;
+}
+.chip-turno{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  margin:10px 18px 0;padding:9px 13px;border-radius:9px;width:calc(100% - 36px);
+  background:var(--panel);border:1px solid var(--linea);color:var(--texto);
+  font-size:13px;cursor:pointer;text-align:left;
+}
+.chip-turno .chip-hora{
+  font-family:ui-monospace,Menlo,monospace;color:var(--ambar);
+  font-size:12.5px;white-space:nowrap;
+}
+.aviso{
+  margin:12px 18px 0;padding:10px 14px;border-radius:8px;
+  background:#2a1d10;border:1px solid var(--ambar-osc);
+  color:var(--ambar);font-size:13.5px;
+}
+main{flex:1;padding:20px 18px 95px;overflow-y:auto}
+.guia{color:var(--apagado);font-size:14px;line-height:1.5;text-align:center;margin-bottom:8px}
+.oculto{display:none !important}
+
+/* pantalla nuevo */
+.centro{display:flex;flex-direction:column;align-items:center;gap:16px}
+.ptt{
+  position:relative;width:150px;height:150px;border-radius:50%;
+  border:2px solid var(--linea);background:var(--panel);color:var(--texto);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  cursor:pointer;transition:transform .1s;
+}
+.ptt:active{transform:scale(.96)}
+.ptt-icono{font-size:34px;line-height:1}
+.ptt-texto{
+  font-family:ui-monospace,Menlo,monospace;font-size:12px;
+  letter-spacing:.16em;color:var(--ambar);
+}
+.anillo{position:absolute;inset:-12px;border-radius:50%;border:2px solid var(--rojo);opacity:0}
+.ptt.escuchando{border-color:var(--rojo)}
+.ptt.escuchando .ptt-texto{color:var(--rojo)}
+.ptt.escuchando .anillo{opacity:1;animation:pulso 1.4s ease-out infinite}
+@keyframes pulso{0%{transform:scale(.92);opacity:.9}100%{transform:scale(1.12);opacity:0}}
+@media (prefers-reduced-motion:reduce){.anillo{animation:none;opacity:.6}}
+.canal{
+  width:100%;background:var(--panel);border:1px solid var(--linea);
+  border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;
+}
+.canal-titulo{
+  font-family:ui-monospace,Menlo,monospace;font-size:12px;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--ambar);text-align:center;
+}
+textarea,input,select{
+  background:var(--fondo);border:1px solid var(--linea);border-radius:10px;
+  color:var(--texto);padding:12px 13px;font-size:16px;width:100%;
+  font-family:inherit;resize:vertical;line-height:1.55;
+}
+textarea:focus,input:focus,select:focus{outline:none;border-color:var(--ambar)}
+.primario{
+  background:var(--ambar);color:#161200;border:none;
+  padding:14px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;width:100%;
+}
+.primario:disabled{opacity:.4}
+.secundario{
+  background:none;border:1px solid var(--linea);color:var(--texto);
+  padding:12px 20px;border-radius:10px;font-size:15px;cursor:pointer;
+}
+.enlace{
+  background:none;border:none;color:var(--apagado);font-size:14px;
+  text-decoration:underline;cursor:pointer;padding:6px;
+}
+.formulario{display:flex;flex-direction:column;gap:14px}
+.campo{display:flex;flex-direction:column;gap:6px;flex:1}
+.campo label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--apagado)}
+.campo input,.campo select,.campo textarea{background:var(--panel)}
+.fila{display:flex;gap:12px}
+.acciones{display:flex;gap:12px;margin-top:6px}
+.acciones .primario{flex:1;width:auto}
+
+/* historial */
+.historial{display:flex;flex-direction:column;gap:14px}
+.tarjeta{
+  background:var(--panel);border:1px solid var(--linea);border-left:4px solid var(--ok);
+  border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;
+}
+.tarjeta.incidencia{border-left-color:var(--rojo)}
+.tarjeta-cab{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.etiqueta{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--rojo)}
+.etiqueta.ok{color:var(--ok)}
+.tarjeta-cab time{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--apagado)}
+.texto{font-size:14.5px;line-height:1.55}
+.tarjeta-pie{display:flex;justify-content:flex-end;gap:14px}
+.mini{
+  background:none;border:none;color:var(--apagado);
+  font-size:12.5px;cursor:pointer;text-decoration:underline;padding:4px;
+}
+.util{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+/* nav */
+nav{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:520px;display:flex;
+  background:var(--panel);border-top:1px solid var(--linea);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+nav button{
+  flex:1;padding:15px;background:none;border:none;color:var(--apagado);
+  font-size:15px;font-weight:600;cursor:pointer;border-top:3px solid transparent;
+}
+nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
+
+/* informe */
+.informe-cont{display:flex;flex-direction:column;gap:14px}
+.informe{
+  background:#FFFFFF;color:#14181D;border-radius:10px;
+  padding:26px 24px;font-size:13.5px;line-height:1.55;
+}
+.inf-cab{border-bottom:2px solid #14181D;padding-bottom:10px;margin-bottom:14px}
+.inf-cab h2{font-size:15px;letter-spacing:.05em}
+.inf-fecha{font-size:12px;color:#5a636e;margin-top:4px}
+.inf-datos{width:100%;border-collapse:collapse;margin-bottom:16px}
+.inf-datos th,.inf-datos td{border:1px solid #c9ced4;padding:7px 9px;text-align:left;font-size:12.5px}
+.inf-datos th{background:#eef0f2;font-weight:700;width:17%}
+.inf-parte{border-bottom:1px solid #dfe3e7;padding:10px 0}
+.inf-linea{border-bottom:1px solid #dfe3e7;padding:9px 0;line-height:1.6}
+.inf-parte h3{font-size:13px;margin-bottom:6px;letter-spacing:.03em}
+.inf-hito{
+  font-size:12px;font-weight:700;letter-spacing:.06em;color:#14181D;
+  background:#eef0f2;border:1px solid #c9ced4;border-radius:4px;
+  padding:6px 10px;margin:8px 0;
+}
+.inf-pie{margin-top:18px;font-size:12px;color:#3a4048}
+.inf-firma{display:flex;justify-content:space-between;align-items:flex-end;margin-top:34px;gap:20px}
+.linea-firma{border-top:1px solid #14181D;padding-top:4px;min-width:150px;text-align:center}
+
+@media print{
+  header.cab,.chip-turno,.aviso,nav,.no-print{display:none !important}
+  body{background:#fff}
+  .app{max-width:none}
+  main{padding:0;overflow:visible}
+  .informe{border-radius:0;padding:0}
+  .inf-parte,.inf-hito,.inf-linea{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header class="cab">
+  <div class="marca">
+    <span class="chapa" aria-hidden="true"></span>
+    <div>
+      <h1>Parte de servicio</h1>
+      <p class="sub">Registro del turno · v2.1</p>
+    </div>
+  </div>
+  <time class="reloj" id="reloj">--:--:--</time>
+</header>
+
+<button class="chip-turno oculto" id="chipTurno"></button>
+<div class="aviso oculto" id="aviso"></div>
+
+<!-- TURNO -->
+<main id="v-turno" class="formulario oculto">
+  <p class="guia">Datos del servicio. Se registran al inicio del turno y se añaden automáticamente a cada entrada.</p>
+  <div class="campo"><label>Nombre del vigilante</label><input id="t-vigilante" placeholder="Nombre y apellidos"></div>
+  <div class="campo"><label>Nº de TIP</label><input id="t-tip" placeholder="Ej.: 113.436"></div>
+  <div class="campo"><label>Servicio / puesto</label><input id="t-servicio" placeholder="Ej.: Palacio — acceso principal"></div>
+  <div class="fila">
+    <div class="campo"><label>Inicio del turno</label><input id="t-inicio" type="time"></div>
+    <div class="campo"><label>Fin del turno</label><input id="t-fin" type="time"></div>
+  </div>
+  <div class="acciones">
+    <button class="secundario oculto" id="btnCancelTurno">Cancelar</button>
+    <button class="primario" id="btnGuardarTurno">Iniciar turno</button>
+  </div>
+</main>
+
+<!-- NUEVO -->
+<main id="v-nuevo" class="centro oculto">
+  <button class="ptt" id="ptt">
+    <span class="anillo" aria-hidden="true"></span>
+    <span class="ptt-icono" id="pttIcono">🎙</span>
+    <span class="ptt-texto" id="pttTexto">DICTAR</span>
+  </button>
+  <div class="canal">
+    <p class="canal-titulo">Registro del turno</p>
+    <p class="guia" id="guiaNuevo">Pulsa el botón y dicta la novedad, o escribe en el cuadro: rondas, relevos, controles o incidencias.</p>
+    <textarea id="txtDictado" rows="5" placeholder="«Las 23:00, primera ronda por planta baja y sótano, todo correcto…»"></textarea>
+    <button class="primario" id="btnRedactar" disabled>Añadir al parte</button>
+  </div>
+  <button class="enlace" id="btnManual">Escribir la entrada a mano</button>
+</main>
+
+<!-- REVISAR -->
+<main id="v-revisar" class="formulario oculto">
+  <p class="guia" id="guiaRevisar">Revisa el texto, ajusta la hora si hace falta y guarda.</p>
+  <div class="campo"><label>Texto de la entrada</label><textarea id="e-texto" rows="6" placeholder="Qué ha ocurrido y qué se ha hecho"></textarea></div>
+  <div class="fila">
+    <div class="campo"><label>Hora</label><input id="e-hora" type="time"></div>
+    <div class="campo"><label>Incidencia (opcional)</label><select id="e-tipo"></select></div>
+  </div>
+  <div class="acciones">
+    <button class="secundario" id="btnCancelEntrada">Cancelar</button>
+    <button class="primario" id="btnGuardarEntrada">Guardar entrada</button>
+  </div>
+</main>
+
+<!-- HISTORIAL -->
+<main id="v-historial" class="historial oculto">
+  <button class="primario oculto" id="btnInforme">Exportar informe del turno (PDF)</button>
+  <div id="listaPartes"></div>
+  <p class="guia oculto" id="vacio">Aún no hay entradas. Dicta o escribe la primera desde la pestaña Nuevo.</p>
+  <div class="util">
+    <button class="mini" id="btnExportar">Copia de seguridad (JSON)</button>
+    <button class="mini" id="btnImportar">Restaurar copia</button>
+    <input type="file" id="fileImport" accept=".json" class="oculto">
+  </div>
+</main>
+
+<!-- INFORME -->
+<main id="v-informe" class="informe-cont oculto">
+  <div class="acciones no-print">
+    <button class="secundario" id="btnVolver">Volver</button>
+    <button class="primario" id="btnPDF">Guardar como PDF</button>
+  </div>
+  <section class="informe" id="informe"></section>
+</main>
+
+<nav>
+  <button id="navNuevo" class="activo">Nuevo</button>
+  <button id="navHistorial">Historial</button>
+</nav>
+</div>
+
+<script>
+"use strict";
+// ---------- estado ----------
+var TIPOS=["Intrusión","Hurto / robo","Daños","Salto de alarma","Emergencia / accidente","Control de accesos","Otros"];
+var turno=null, partes=[], editId=null, escuchando=false, rec=null, finalTxt="", horaCaptura="";
+
+function cargar(k,def){try{var v=localStorage.getItem(k);return v?JSON.parse(v):def}catch(e){return def}}
+function guardar(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){avisar("No se pudo guardar en el dispositivo.")}}
+turno=cargar("ps_turno",null);
+partes=cargar("ps_partes",[]);
+
+// ---------- utilidades ----------
+function $(id){return document.getElementById(id)}
+function esc(s){var d=document.createElement("div");d.textContent=s||"";return d.innerHTML}
+function ahora(){return new Date().toTimeString().slice(0,5)}
+function fechaLarga(iso){return new Date(iso).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"})}
+function avisar(m){var a=$("aviso");if(!m){a.classList.add("oculto");return}a.textContent=m;a.classList.remove("oculto")}
+
+// ---------- navegación ----------
+var VISTAS=["turno","nuevo","revisar","historial","informe"];
+function ir(v){
+  VISTAS.forEach(function(x){$("v-"+x).classList.toggle("oculto",x!==v)});
+  $("navNuevo").classList.toggle("activo",v==="nuevo"||v==="revisar");
+  $("navHistorial").classList.toggle("activo",v==="historial"||v==="informe");
+  avisar("");
+  if(v==="historial")pintarHistorial();
+  if(v==="informe")pintarInforme();
+  if(v==="turno")pintarTurnoForm();
+  pintarChip(v);
+}
+function pintarChip(v){
+  var c=$("chipTurno");
+  if(!turno||v==="turno"){c.classList.add("oculto");return}
+  c.classList.remove("oculto");
+  c.innerHTML="<span>"+esc(turno.vigilante)+" · TIP "+esc(turno.tip)+(turno.servicio?" · "+esc(turno.servicio):"")+"</span>"+
+    "<span class='chip-hora'>"+(turno.horaInicio&&turno.horaFin?esc(turno.horaInicio)+"–"+esc(turno.horaFin):"Editar")+"</span>";
+}
+$("chipTurno").onclick=function(){ir("turno")};
+$("navNuevo").onclick=function(){ir(turno?"nuevo":"turno")};
+$("navHistorial").onclick=function(){ir("historial")};
+
+// ---------- reloj ----------
+setInterval(function(){$("reloj").textContent=new Date().toTimeString().slice(0,8)},1000);
+
+// ---------- turno ----------
+function pintarTurnoForm(){
+  var t=turno||{};
+  $("t-vigilante").value=t.vigilante||"";
+  $("t-tip").value=t.tip||"";
+  $("t-servicio").value=t.servicio||"";
+  $("t-inicio").value=t.horaInicio||"";
+  $("t-fin").value=t.horaFin||"";
+  $("btnGuardarTurno").textContent=turno?"Guardar cambios":"Iniciar turno";
+  $("btnCancelTurno").classList.toggle("oculto",!turno);
+}
+$("btnCancelTurno").onclick=function(){ir("nuevo")};
+$("btnGuardarTurno").onclick=function(){
+  var v=$("t-vigilante").value.trim(),p=$("t-tip").value.trim();
+  if(!v||!p){avisar("Nombre del vigilante y nº de TIP son obligatorios.");return}
+  turno={vigilante:v,tip:p,servicio:$("t-servicio").value.trim(),horaInicio:$("t-inicio").value,horaFin:$("t-fin").value};
+  guardar("ps_turno",turno);
+  ir("nuevo");
+};
+
+// ---------- dictado (micrófono directo) ----------
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!SR){$("ptt").classList.add("oculto")}
+$("ptt").onclick=function(){
+  if(escuchando){pararDictado();return}
+  finalTxt="";
+  if(!$("txtDictado").value.trim())horaCaptura=ahora();
+  rec=new SR();
+  rec.lang="es-ES";rec.continuous=true;rec.interimResults=true;
+  rec.onresult=function(ev){
+    var interim="";
+    for(var i=ev.resultIndex;i<ev.results.length;i++){
+      var t=ev.results[i][0].transcript;
+      if(ev.results[i].isFinal)finalTxt+=t+" ";else interim+=t;
+    }
+    $("txtDictado").value=(finalTxt+interim).trim();
+    actualizarBtn();
+  };
+  rec.onerror=function(ev){
+    escuchando=false;pintarPTT();
+    var m={"not-allowed":"Permiso de micrófono denegado. Actívalo en los ajustes del navegador o dicta con el teclado.",
+      "no-speech":"No se ha captado voz. Repite.",
+      "network":"El reconocimiento necesita conexión."};
+    avisar(m[ev.error]||"Fallo del micrófono ("+ev.error+"). Dicta con el micrófono del teclado.");
+  };
+  rec.onend=function(){if(escuchando){escuchando=false;pintarPTT()}};
+  try{rec.start();escuchando=true;pintarPTT();avisar("")}catch(e){avisar("No se pudo iniciar el micrófono.")}
+};
+function pararDictado(){escuchando=false;if(rec)rec.stop();pintarPTT()}
+function pintarPTT(){
+  var b=$("ptt");
+  b.classList.toggle("escuchando",escuchando);
+  $("pttIcono").textContent=escuchando?"■":"🎙";
+  $("pttTexto").textContent=escuchando?"TERMINAR":"DICTAR";
+}
+$("txtDictado").oninput=function(){if(this.value.trim()&&!horaCaptura)horaCaptura=ahora();actualizarBtn()};
+function actualizarBtn(){$("btnRedactar").disabled=!$("txtDictado").value.trim()}
+
+// ---------- añadir al parte (sin IA) ----------
+$("btnRedactar").onclick=function(){
+  if(escuchando)pararDictado();
+  var texto=$("txtDictado").value.trim();
+  if(!texto)return;
+  abrirRevisar({hora:horaCaptura||ahora(),tipo:"",texto:texto},null);
+  $("txtDictado").value="";horaCaptura="";actualizarBtn();
+};
+$("btnManual").onclick=function(){abrirRevisar({hora:ahora(),tipo:"",texto:""},null)};
+
+// ---------- revisar / editar ----------
+var sel=$("e-tipo");
+sel.innerHTML='<option value="">— No es incidencia —</option>'+TIPOS.map(function(t){return '<option value="'+t+'">'+t+'</option>'}).join("");
+function abrirRevisar(e,id){
+  editId=id;
+  $("e-texto").value=e.texto;$("e-hora").value=e.hora;$("e-tipo").value=e.tipo;
+  $("guiaRevisar").textContent=id?"Edita la entrada y guarda los cambios.":"Revisa el texto, ajusta la hora si hace falta y guarda.";
+  $("btnGuardarEntrada").textContent=id?"Guardar cambios":"Guardar entrada";
+  ir("revisar");
+}
+$("btnCancelEntrada").onclick=function(){var d=editId?"historial":"nuevo";editId=null;ir(d)};
+$("btnGuardarEntrada").onclick=function(){
+  var texto=$("e-texto").value.trim();
+  if(!texto){avisar("El texto no puede quedar vacío.");return}
+  var e={hora:$("e-hora").value||ahora(),tipo:$("e-tipo").value,texto:texto};
+  if(editId){
+    partes=partes.map(function(p){return p.id===editId?Object.assign({},p,e):p});
+  }else{
+    partes.unshift(Object.assign({id:Date.now(),fecha:new Date().toISOString(),vigilante:turno.vigilante,tip:turno.tip,servicio:turno.servicio},e));
+  }
+  editId=null;
+  guardar("ps_partes",partes);
+  ir("historial");
+};
+
+// ---------- historial ----------
+function pintarHistorial(){
+  $("btnInforme").classList.toggle("oculto",partes.length===0);
+  $("vacio").classList.toggle("oculto",partes.length>0);
+  $("navHistorial").textContent="Historial"+(partes.length?" ("+partes.length+")":"");
+  var h=partes.map(function(p){
+    return '<article class="tarjeta'+(p.tipo?' incidencia':'')+'">'+
+      '<div class="tarjeta-cab"><span class="etiqueta'+(p.tipo?'':' ok')+'">'+esc(p.tipo||"Registro")+'</span>'+
+      '<time>'+fechaLarga(p.fecha)+' · '+esc(p.hora)+'</time></div>'+
+      '<p class="texto">'+esc(p.texto)+'</p>'+
+      '<div class="tarjeta-pie"><button class="mini" data-e="'+p.id+'">Editar</button>'+
+      '<button class="mini" data-x="'+p.id+'">Eliminar</button></div></article>';
+  }).join("");
+  $("listaPartes").innerHTML=h;
+  $("listaPartes").querySelectorAll("[data-e]").forEach(function(b){
+    b.onclick=function(){var p=partes.find(function(x){return x.id==b.dataset.e});abrirRevisar({hora:p.hora,tipo:p.tipo,texto:p.texto},p.id)};
+  });
+  $("listaPartes").querySelectorAll("[data-x]").forEach(function(b){
+    b.onclick=function(){partes=partes.filter(function(x){return x.id!=b.dataset.x});guardar("ps_partes",partes);pintarHistorial()};
+  });
+}
+$("btnInforme").onclick=function(){ir("informe")};
+
+// ---------- copia de seguridad JSON ----------
+$("btnExportar").onclick=function(){
+  var blob=new Blob([JSON.stringify({turno:turno,partes:partes},null,2)],{type:"application/json"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="parte-servicio-"+new Date().toISOString().slice(0,10)+".json";
+  a.click();
+};
+$("btnImportar").onclick=function(){$("fileImport").click()};
+$("fileImport").onchange=function(ev){
+  var f=ev.target.files[0];if(!f)return;
+  var r=new FileReader();
+  r.onload=function(){
+    try{
+      var d=JSON.parse(r.result);
+      if(d.turno){turno=d.turno;guardar("ps_turno",turno)}
+      if(Array.isArray(d.partes)){partes=d.partes;guardar("ps_partes",partes)}
+      pintarHistorial();pintarChip("historial");
+    }catch(e){avisar("El archivo no es una copia válida.")}
+  };
+  r.readAsText(f);
+};
+
+// ---------- informe ----------
+function pintarInforme(){
+  var t=turno||{};
+  var crono=partes.slice().sort(function(a,b){return a.id-b.id});
+  var h='<header class="inf-cab"><h2>PARTE DE SERVICIO</h2>'+
+    '<p class="inf-fecha">Emitido el '+fechaLarga(new Date().toISOString())+' a las '+ahora()+'</p></header>'+
+    '<table class="inf-datos"><tr><th>Vigilante</th><td>'+esc(t.vigilante||"—")+'</td><th>Nº TIP</th><td>'+esc(t.tip||"—")+'</td></tr>'+
+    '<tr><th>Servicio</th><td>'+esc(t.servicio||"—")+'</td><th>Turno</th><td>'+(t.horaInicio&&t.horaFin?esc(t.horaInicio)+" – "+esc(t.horaFin):"—")+'</td></tr></table>';
+  if(t.horaInicio)h+='<p class="inf-hito">▸ INICIO DE SERVICIO — '+esc(t.horaInicio)+' h</p>';
+  crono.forEach(function(p,i){
+    h+='<p class="inf-linea"><strong>'+esc(p.hora)+' h</strong>'+(p.tipo?' — <strong>'+esc(p.tipo.toUpperCase())+'</strong>':'')+' — '+esc(p.texto)+'</p>';
+  });
+  if(t.horaFin)h+='<p class="inf-hito">▸ FINALIZACIÓN DE SERVICIO — '+esc(t.horaFin)+' h</p>';
+  h+='<footer class="inf-pie"><p>Total de registros: '+crono.length+'. El vigilante abajo firmante certifica la veracidad de lo reflejado en el presente parte.</p>'+
+    '<div class="inf-firma"><span>Fdo.: '+esc(t.vigilante||"")+' — TIP '+esc(t.tip||"")+'</span><span class="linea-firma">Firma</span></div></footer>';
+  $("informe").innerHTML=h;
+}
+$("btnVolver").onclick=function(){ir("historial")};
+$("btnPDF").onclick=function(){window.print()};
+
+// ---------- arranque ----------
+ir(turno?"nuevo":"turno");
+pintarHistorial();
+</script>
+</body>
+</html>
