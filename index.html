@@ -34,6 +34,11 @@ h1{font-size:17px;font-weight:700;letter-spacing:.02em}
   font-family:ui-monospace,'Cascadia Mono',Menlo,monospace;
   font-size:15px;color:var(--ambar);letter-spacing:.08em;
 }
+.banda-pruebas{
+  margin:10px 18px 0;padding:8px 13px;border-radius:8px;
+  background:#2a1d10;border:1px dashed var(--ambar-osc);
+  color:var(--ambar);font-size:12.5px;text-align:center;letter-spacing:.03em;
+}
 .chip-turno{
   display:flex;justify-content:space-between;align-items:center;gap:10px;
   margin:10px 18px 0;padding:9px 13px;border-radius:9px;width:calc(100% - 36px);
@@ -120,12 +125,32 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:var(--ambar)}
 .etiqueta.ok{color:var(--ok)}
 .tarjeta-cab time{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--apagado)}
 .texto{font-size:14.5px;line-height:1.55}
+.autor{font-size:12px;color:var(--apagado);letter-spacing:.02em}
+.autor.ajeno{color:var(--ambar)}
 .tarjeta-pie{display:flex;justify-content:flex-end;gap:14px}
 .mini{
   background:none;border:none;color:var(--apagado);
   font-size:12.5px;cursor:pointer;text-decoration:underline;padding:4px;
 }
 .util{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+/* modal PIN */
+.modal{
+  position:fixed;inset:0;z-index:60;padding:24px;
+  background:rgba(6,9,13,.82);display:flex;align-items:center;justify-content:center;
+}
+.modal-caja{
+  width:100%;max-width:340px;background:var(--panel);
+  border:1px solid var(--linea);border-radius:14px;padding:20px;
+  display:flex;flex-direction:column;gap:12px;
+}
+.modal-titulo{font-size:15px;font-weight:700}
+.modal-texto{font-size:13.5px;color:var(--apagado);line-height:1.5}
+.modal-pin{
+  text-align:center;letter-spacing:.45em;font-size:22px;
+  font-family:ui-monospace,Menlo,monospace;background:var(--fondo);
+}
+.modal-error{color:var(--rojo);font-size:13px;text-align:center}
 
 /* nav */
 nav{
@@ -165,7 +190,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
 .linea-firma{border-top:1px solid #14181D;padding-top:4px;min-width:150px;text-align:center}
 
 @media print{
-  header.cab,.chip-turno,.aviso,nav,.no-print{display:none !important}
+  header.cab,.chip-turno,.aviso,.banda-pruebas,.modal,nav,.no-print{display:none !important}
   body{background:#fff}
   .app{max-width:none}
   main{padding:0;overflow:visible}
@@ -182,12 +207,13 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <span class="chapa" aria-hidden="true"></span>
     <div>
       <h1>Parte de servicio</h1>
-      <p class="sub">Registro del turno · v2.3</p>
+      <p class="sub">Registro del turno · v2.4</p>
     </div>
   </div>
   <time class="reloj" id="reloj">--:--:--</time>
 </header>
 
+<div class="banda-pruebas oculto" id="bandaPruebas">MODO PRUEBAS · el PIN 6969 vale para todo</div>
 <button class="chip-turno oculto" id="chipTurno"></button>
 <div class="aviso oculto" id="aviso"></div>
 
@@ -205,6 +231,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <button class="secundario oculto" id="btnCancelTurno">Cancelar</button>
     <button class="primario" id="btnGuardarTurno">Iniciar turno</button>
   </div>
+  <button class="enlace oculto" id="btnRelevo">Relevo: entra otro vigilante</button>
 </main>
 
 <!-- NUEVO -->
@@ -264,16 +291,44 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
 </nav>
 </div>
 
+<!-- MODAL PIN -->
+<div class="modal oculto" id="modal">
+  <div class="modal-caja">
+    <p class="modal-titulo" id="modalTitulo">PIN</p>
+    <p class="modal-texto" id="modalTexto"></p>
+    <input class="modal-pin" id="modalPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="····">
+    <p class="modal-error oculto" id="modalError"></p>
+    <div class="acciones">
+      <button class="secundario" id="modalCancel">Cancelar</button>
+      <button class="primario" id="modalOk">Aceptar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 "use strict";
+
+/* =========================================================
+   MODO PRUEBAS
+   Con true, el PIN 6969 vale para todo y los PIN nuevos se
+   crean solos con ese valor. Para pasar a producción:
+   cambiar la línea siguiente a false y borrar los datos de
+   la app en el navegador para empezar limpio.
+   ========================================================= */
+var MODO_PRUEBAS = true;
+var PIN_PRUEBAS  = "6969";
+
 // ---------- estado ----------
 var TIPOS=["Intrusión","Hurto / robo","Daños","Salto de alarma","Emergencia / accidente","Control de accesos","Otros"];
-var turno=null, partes=[], editId=null, escuchando=false, rec=null, finalTxt="", horaCaptura="";
+var turno=null, partes=[], pins={}, maestro=null;
+var editId=null, escuchando=false, rec=null, horaCaptura="";
 
 function cargar(k,def){try{var v=localStorage.getItem(k);return v?JSON.parse(v):def}catch(e){return def}}
 function guardar(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){avisar("No se pudo guardar en el dispositivo.")}}
 turno=cargar("ps_turno",null);
 partes=cargar("ps_partes",[]);
+pins=cargar("ps_pins",{});
+maestro=cargar("ps_maestro",null);
 
 // ---------- utilidades ----------
 function $(id){return document.getElementById(id)}
@@ -281,6 +336,68 @@ function esc(s){var d=document.createElement("div");d.textContent=s||"";return d
 function ahora(){return new Date().toTimeString().slice(0,5)}
 function fechaLarga(iso){return new Date(iso).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"})}
 function avisar(m){var a=$("aviso");if(!m){a.classList.add("oculto");return}a.textContent=m;a.classList.remove("oculto")}
+
+// ---------- PIN ----------
+// Los PIN no se guardan en claro: se guarda una huella del PIN.
+function huella(p){
+  var h=5381,s="ps."+p;
+  for(var i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))>>>0;
+  return "h"+h.toString(36);
+}
+function esMaestro(p){
+  if(MODO_PRUEBAS&&p===PIN_PRUEBAS)return true;
+  return !!maestro&&huella(p)===maestro;
+}
+function pinValido(p,tip){
+  if(MODO_PRUEBAS&&p===PIN_PRUEBAS)return true;
+  if(esMaestro(p))return true;
+  return !!(tip&&pins[tip]&&huella(p)===pins[tip]);
+}
+
+var pinCB=null,pinValidador=null,fallos=0,bloqueoHasta=0;
+function pedirPin(titulo,texto,validador,cb){
+  pinCB=cb;pinValidador=validador;
+  $("modalTitulo").textContent=titulo;
+  $("modalTexto").textContent=texto;
+  $("modalPin").value="";
+  $("modalError").classList.add("oculto");
+  $("modal").classList.remove("oculto");
+  setTimeout(function(){$("modalPin").focus()},60);
+}
+function cerrarModal(){$("modal").classList.add("oculto");pinCB=null;pinValidador=null}
+function errPin(m){var e=$("modalError");e.textContent=m;e.classList.remove("oculto")}
+$("modalCancel").onclick=cerrarModal;
+$("modalOk").onclick=function(){
+  var t=Date.now();
+  if(t<bloqueoHasta){errPin("Demasiados intentos. Espera "+Math.ceil((bloqueoHasta-t)/1000)+" s.");return}
+  var p=$("modalPin").value.trim();
+  if(pinValidador&&pinValidador(p)){
+    fallos=0;var cb=pinCB;cerrarModal();if(cb)cb(p);
+  }else{
+    fallos++;
+    if(fallos>=5){bloqueoHasta=t+30000;fallos=0;errPin("Demasiados intentos. Espera 30 s.")}
+    else errPin("PIN incorrecto.");
+    $("modalPin").value="";
+  }
+};
+$("modalPin").onkeydown=function(ev){if(ev.key==="Enter"){ev.preventDefault();$("modalOk").click()}};
+
+// Crea el PIN de un TIP si aún no lo tiene.
+function asegurarPin(tip,cb){
+  if(pins[tip])return cb();
+  if(MODO_PRUEBAS){pins[tip]=huella(PIN_PRUEBAS);guardar("ps_pins",pins);return cb()}
+  pedirPin("Crea tu PIN","Elige un PIN de 4 dígitos para el TIP "+tip+". Te lo pedirá al volver a este turno y para que nadie corrija tus entradas.",
+    function(p){return /^\d{4}$/.test(p)},
+    function(p){pins[tip]=huella(p);guardar("ps_pins",pins);cb()});
+}
+// Pide permiso sobre una entrada ajena.
+function conPermiso(p,cb){
+  var t=p.tip||"";
+  if(!t||(turno&&t===turno.tip))return cb();
+  pedirPin("Entrada de otro vigilante",
+    "La registró "+(p.vigilante||"otro vigilante")+" (TIP "+t+"). Introduce su PIN o el PIN maestro.",
+    function(x){return pinValido(x,t)},cb);
+}
 
 // ---------- navegación ----------
 var VISTAS=["turno","nuevo","revisar","historial","informe"];
@@ -318,14 +435,30 @@ function pintarTurnoForm(){
   $("t-fin").value=t.horaFin||"";
   $("btnGuardarTurno").textContent=turno?"Guardar cambios":"Iniciar turno";
   $("btnCancelTurno").classList.toggle("oculto",!turno);
+  $("btnRelevo").classList.toggle("oculto",!turno);
 }
 $("btnCancelTurno").onclick=function(){ir("nuevo")};
+$("btnRelevo").onclick=function(){
+  if(!confirm("¿Cerrar el turno de "+turno.vigilante+" y dejar el móvil listo para el siguiente vigilante?\n\nLas entradas se conservan y quedarán protegidas con su PIN."))return;
+  turno=null;guardar("ps_turno",null);
+  pintarTurnoForm();pintarChip("turno");
+  avisar("Turno cerrado. Introduce los datos del vigilante entrante.");
+};
 $("btnGuardarTurno").onclick=function(){
   var v=$("t-vigilante").value.trim(),p=$("t-tip").value.trim();
   if(!v||!p){avisar("Nombre del vigilante y nº de TIP son obligatorios.");return}
-  turno={vigilante:v,tip:p,servicio:$("t-servicio").value.trim(),horaInicio:$("t-inicio").value,horaFin:$("t-fin").value};
-  guardar("ps_turno",turno);
-  ir("nuevo");
+  var aplicar=function(){
+    turno={vigilante:v,tip:p,servicio:$("t-servicio").value.trim(),horaInicio:$("t-inicio").value,horaFin:$("t-fin").value};
+    guardar("ps_turno",turno);
+    ir("nuevo");
+  };
+  if(turno&&turno.tip===p)return aplicar();               // mismo vigilante ajustando sus datos
+  if(pins[p]){                                            // TIP ya conocido: hay que demostrar que eres tú
+    pedirPin("PIN del vigilante","El TIP "+p+" ya tiene PIN en este móvil. Introdúcelo para iniciar turno.",
+      function(x){return pinValido(x,p)},aplicar);
+    return;
+  }
+  asegurarPin(p,aplicar);                                 // TIP nuevo: se crea su PIN
 };
 
 // ---------- dictado (micrófono directo) ----------
@@ -376,7 +509,7 @@ function pintarPTT(){
 $("txtDictado").oninput=function(){if(this.value.trim()&&!horaCaptura)horaCaptura=ahora();actualizarBtn()};
 function actualizarBtn(){$("btnRedactar").disabled=!$("txtDictado").value.trim()}
 
-// ---------- añadir al parte (sin IA) ----------
+// ---------- añadir al parte ----------
 $("btnRedactar").onclick=function(){
   if(escuchando)pararDictado();
   var texto=$("txtDictado").value.trim();
@@ -416,33 +549,49 @@ function pintarHistorial(){
   $("btnInforme").classList.toggle("oculto",partes.length===0);
   $("vacio").classList.toggle("oculto",partes.length>0);
   $("navHistorial").textContent="Historial"+(partes.length?" ("+partes.length+")":"");
+  var miTip=turno?turno.tip:"";
   var h=partes.map(function(p){
+    var ajena=p.tip&&p.tip!==miTip;
     return '<article class="tarjeta'+(p.tipo?' incidencia':'')+'">'+
       '<div class="tarjeta-cab"><span class="etiqueta'+(p.tipo?'':' ok')+'">'+esc(p.tipo||"Registro")+'</span>'+
       '<time>'+fechaLarga(p.fecha)+' · '+esc(p.hora)+'</time></div>'+
       '<p class="texto">'+esc(p.texto)+'</p>'+
+      '<p class="autor'+(ajena?' ajena':'')+'">'+(ajena?'🔒 ':'')+esc(p.vigilante||"—")+(p.tip?' · TIP '+esc(p.tip):'')+'</p>'+
       '<div class="tarjeta-pie"><button class="mini" data-e="'+p.id+'">Editar</button>'+
       '<button class="mini" data-x="'+p.id+'">Eliminar</button></div></article>';
   }).join("");
   $("listaPartes").innerHTML=h;
   $("listaPartes").querySelectorAll("[data-e]").forEach(function(b){
-    b.onclick=function(){var p=partes.find(function(x){return x.id==b.dataset.e});abrirRevisar({hora:p.hora,tipo:p.tipo,texto:p.texto},p.id)};
+    b.onclick=function(){
+      var p=partes.find(function(x){return x.id==b.dataset.e});
+      conPermiso(p,function(){abrirRevisar({hora:p.hora,tipo:p.tipo,texto:p.texto},p.id)});
+    };
   });
   $("listaPartes").querySelectorAll("[data-x]").forEach(function(b){
-    b.onclick=function(){partes=partes.filter(function(x){return x.id!=b.dataset.x});guardar("ps_partes",partes);pintarHistorial()};
+    b.onclick=function(){
+      var p=partes.find(function(x){return x.id==b.dataset.x});
+      conPermiso(p,function(){
+        if(!confirm("¿Eliminar esta entrada del parte?"))return;
+        partes=partes.filter(function(x){return x.id!=p.id});
+        guardar("ps_partes",partes);pintarHistorial();
+      });
+    };
   });
 }
 $("btnInforme").onclick=function(){ir("informe")};
 
 // ---------- copia de seguridad JSON ----------
 $("btnExportar").onclick=function(){
-  var blob=new Blob([JSON.stringify({turno:turno,partes:partes},null,2)],{type:"application/json"});
+  var blob=new Blob([JSON.stringify({turno:turno,partes:partes,pins:pins,maestro:maestro},null,2)],{type:"application/json"});
   var a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
   a.download="parte-servicio-"+new Date().toISOString().slice(0,10)+".json";
   a.click();
 };
-$("btnImportar").onclick=function(){$("fileImport").click()};
+$("btnImportar").onclick=function(){
+  pedirPin("PIN maestro","Restaurar una copia sustituye todo lo guardado en el móvil. Solo el jefe de equipo.",
+    esMaestro,function(){$("fileImport").click()});
+};
 $("fileImport").onchange=function(ev){
   var f=ev.target.files[0];if(!f)return;
   var r=new FileReader();
@@ -451,22 +600,28 @@ $("fileImport").onchange=function(ev){
       var d=JSON.parse(r.result);
       if(d.turno){turno=d.turno;guardar("ps_turno",turno)}
       if(Array.isArray(d.partes)){partes=d.partes;guardar("ps_partes",partes)}
+      if(d.pins){pins=d.pins;guardar("ps_pins",pins)}
+      if(d.maestro){maestro=d.maestro;guardar("ps_maestro",maestro)}
       pintarHistorial();pintarChip("historial");
+      avisar("Copia restaurada.");
     }catch(e){avisar("El archivo no es una copia válida.")}
   };
   r.readAsText(f);
+  ev.target.value="";
 };
 
 // ---------- informe ----------
 function pintarInforme(){
   var t=turno||{};
-  var crono=partes.slice().sort(function(a,b){return a.id-b.id});
+  // Solo las entradas del vigilante que firma: no se mezclan turnos en un mismo parte.
+  var crono=partes.filter(function(p){return !p.tip||p.tip===t.tip})
+                  .sort(function(a,b){return a.id-b.id});
   var h='<header class="inf-cab"><h2>PARTE DE SERVICIO</h2>'+
     '<p class="inf-fecha">Emitido el '+fechaLarga(new Date().toISOString())+' a las '+ahora()+'</p></header>'+
     '<table class="inf-datos"><tr><th>Vigilante</th><td>'+esc(t.vigilante||"—")+'</td><th>Nº TIP</th><td>'+esc(t.tip||"—")+'</td></tr>'+
     '<tr><th>Servicio</th><td>'+esc(t.servicio||"—")+'</td><th>Turno</th><td>'+(t.horaInicio&&t.horaFin?esc(t.horaInicio)+" – "+esc(t.horaFin):"—")+'</td></tr></table>';
   if(t.horaInicio)h+='<p class="inf-hito">▸ INICIO DE SERVICIO — '+esc(t.horaInicio)+' h</p>';
-  crono.forEach(function(p,i){
+  crono.forEach(function(p){
     h+='<p class="inf-linea"><strong>'+esc(p.hora)+' h</strong>'+(p.tipo?' — <strong>'+esc(p.tipo.toUpperCase())+'</strong>':'')+' — '+esc(p.texto)+'</p>';
   });
   if(t.horaFin)h+='<p class="inf-hito">▸ FINALIZACIÓN DE SERVICIO — '+esc(t.horaFin)+' h</p>';
@@ -478,8 +633,26 @@ $("btnVolver").onclick=function(){ir("historial")};
 $("btnPDF").onclick=function(){window.print()};
 
 // ---------- arranque ----------
-ir(turno?"nuevo":"turno");
-pintarHistorial();
+function arrancar(){
+  if(MODO_PRUEBAS){
+    $("bandaPruebas").classList.remove("oculto");
+    if(!maestro){maestro=huella(PIN_PRUEBAS);guardar("ps_maestro",maestro)}
+    seguirArranque();
+    return;
+  }
+  if(!maestro){
+    pedirPin("PIN maestro","Primera puesta en marcha. El jefe de equipo elige un PIN de 4 dígitos. Sirve para restaurar copias y desbloquear entradas si un vigilante olvida el suyo. Si se pierde, no hay recuperación.",
+      function(p){return /^\d{4}$/.test(p)},
+      function(p){maestro=huella(p);guardar("ps_maestro",maestro);seguirArranque()});
+    return;
+  }
+  seguirArranque();
+}
+function seguirArranque(){
+  ir(turno?"nuevo":"turno");
+  pintarHistorial();
+}
+arrancar();
 </script>
 </body>
 </html>
