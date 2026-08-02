@@ -182,7 +182,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <span class="chapa" aria-hidden="true"></span>
     <div>
       <h1>Parte de servicio</h1>
-      <p class="sub">Registro del turno · v2.2</p>
+      <p class="sub">Registro del turno · v2.3</p>
     </div>
   </div>
   <time class="reloj" id="reloj">--:--:--</time>
@@ -331,33 +331,42 @@ $("btnGuardarTurno").onclick=function(){
 // ---------- dictado (micrófono directo) ----------
 var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 if(!SR){$("ptt").classList.add("oculto")}
+var baseDictado="";
 $("ptt").onclick=function(){
   if(escuchando){pararDictado();return}
-  var prefijo=$("txtDictado").value.trim();
-  if(!prefijo)horaCaptura=ahora();
+  baseDictado=$("txtDictado").value.trim();
+  if(!baseDictado)horaCaptura=ahora();
+  escuchando=true;pintarPTT();avisar("");
+  iniciarSesionVoz();
+};
+function iniciarSesionVoz(){
   rec=new SR();
-  rec.lang="es-ES";rec.continuous=true;rec.interimResults=true;
+  rec.lang="es-ES";
+  rec.continuous=false;      // sesiones cortas: evita el eco acumulativo de Android
+  rec.interimResults=true;
   rec.onresult=function(ev){
-    // Android reenvía fragmentos ya emitidos: se reconstruye todo desde cero
-    var completo="";
-    for(var i=0;i<ev.results.length;i++){
-      completo+=ev.results[i][0].transcript+" ";
+    // solo se toma la última versión de la frase en curso, nunca se suman fragmentos
+    var ultimo=ev.results[ev.results.length-1];
+    var frase=ultimo[0].transcript.replace(/\s+/g," ").trim();
+    $("txtDictado").value=(baseDictado?baseDictado+" ":"")+frase;
+    if(ultimo.isFinal){
+      baseDictado=$("txtDictado").value.trim();
     }
-    completo=completo.replace(/\s+/g," ").trim();
-    $("txtDictado").value=(prefijo?prefijo+" ":"")+completo;
     actualizarBtn();
   };
   rec.onerror=function(ev){
+    if(ev.error==="no-speech"||ev.error==="aborted")return; // el reenganche lo hace onend
     escuchando=false;pintarPTT();
     var m={"not-allowed":"Permiso de micrófono denegado. Actívalo en los ajustes del navegador o dicta con el teclado.",
-      "no-speech":"No se ha captado voz. Repite.",
       "network":"El reconocimiento necesita conexión."};
     avisar(m[ev.error]||"Fallo del micrófono ("+ev.error+"). Dicta con el micrófono del teclado.");
   };
-  rec.onend=function(){if(escuchando){escuchando=false;pintarPTT()}};
-  try{rec.start();escuchando=true;pintarPTT();avisar("")}catch(e){avisar("No se pudo iniciar el micrófono.")}
-};
-function pararDictado(){escuchando=false;if(rec)rec.stop();pintarPTT()}
+  rec.onend=function(){
+    if(escuchando)iniciarSesionVoz(); // sigue escuchando hasta que pulses TERMINAR
+  };
+  try{rec.start()}catch(e){escuchando=false;pintarPTT();avisar("No se pudo iniciar el micrófono.")}
+}
+function pararDictado(){escuchando=false;if(rec){rec.onend=null;rec.stop()}pintarPTT()}
 function pintarPTT(){
   var b=$("ptt");
   b.classList.toggle("escuchando",escuchando);
