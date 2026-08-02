@@ -182,7 +182,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <span class="chapa" aria-hidden="true"></span>
     <div>
       <h1>Parte de servicio</h1>
-      <p class="sub">Registro del turno · v2.1</p>
+      <p class="sub">Registro del turno · v2.2</p>
     </div>
   </div>
   <time class="reloj" id="reloj">--:--:--</time>
@@ -333,17 +333,18 @@ var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 if(!SR){$("ptt").classList.add("oculto")}
 $("ptt").onclick=function(){
   if(escuchando){pararDictado();return}
-  finalTxt="";
-  if(!$("txtDictado").value.trim())horaCaptura=ahora();
+  var prefijo=$("txtDictado").value.trim();
+  if(!prefijo)horaCaptura=ahora();
   rec=new SR();
   rec.lang="es-ES";rec.continuous=true;rec.interimResults=true;
   rec.onresult=function(ev){
-    var interim="";
-    for(var i=ev.resultIndex;i<ev.results.length;i++){
-      var t=ev.results[i][0].transcript;
-      if(ev.results[i].isFinal)finalTxt+=t+" ";else interim+=t;
+    // Android reenvía fragmentos ya emitidos: se reconstruye todo desde cero
+    var completo="";
+    for(var i=0;i<ev.results.length;i++){
+      completo+=ev.results[i][0].transcript+" ";
     }
-    $("txtDictado").value=(finalTxt+interim).trim();
+    completo=completo.replace(/\s+/g," ").trim();
+    $("txtDictado").value=(prefijo?prefijo+" ":"")+completo;
     actualizarBtn();
   };
   rec.onerror=function(ev){
