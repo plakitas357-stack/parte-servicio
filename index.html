@@ -117,6 +117,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:var(--ambar)}
   text-decoration:underline;cursor:pointer;padding:6px;
 }
 .enlace-fin{align-self:flex-end;padding:2px 0;font-size:13px}
+.pista{font-size:12px;color:var(--apagado);line-height:1.4}
 .formulario{display:flex;flex-direction:column;gap:14px}
 .campo{display:flex;flex-direction:column;gap:6px;flex:1}
 .campo label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--apagado)}
@@ -221,7 +222,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <span class="chapa" aria-hidden="true"></span>
     <div>
       <h1>Parte de servicio</h1>
-      <p class="sub">Registro del turno · v2.7</p>
+      <p class="sub">Registro del turno · v2.8</p>
     </div>
   </div>
   <div class="estado">
@@ -245,6 +246,8 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <div class="campo"><label>Inicio del turno</label><input id="t-inicio" type="time"></div>
     <div class="campo"><label>Fin del turno</label><input id="t-fin" type="time"></div>
   </div>
+  <div class="campo"><label>Fecha del parte</label><input id="t-fecha" type="date">
+    <span class="pista">Si el turno empezó la víspera, pon la fecha en que empezó.</span></div>
   <div class="acciones">
     <button class="secundario oculto" id="btnCancelTurno">Cancelar</button>
     <button class="primario" id="btnGuardarTurno">Iniciar turno</button>
@@ -353,6 +356,7 @@ maestro=cargar("ps_maestro",null);
 function $(id){return document.getElementById(id)}
 function esc(s){var d=document.createElement("div");d.textContent=s||"";return d.innerHTML}
 function ahora(){return new Date().toTimeString().slice(0,5)}
+function hoyISO(){var d=new Date();return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)}
 function fechaLarga(iso){return new Date(iso).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"})}
 function avisar(m){var a=$("aviso");if(!m){a.classList.add("oculto");return}a.textContent=m;a.classList.remove("oculto")}
 
@@ -455,6 +459,7 @@ function pintarTurnoForm(){
   $("t-vigilante").value=t.vigilante||"";
   $("t-tip").value=t.tip||"";
   $("t-servicio").value=t.servicio||"";
+  $("t-fecha").value=t.fecha||hoyISO();
   $("t-inicio").value=t.horaInicio||"";
   $("t-fin").value=t.horaFin||"";
   $("btnGuardarTurno").textContent=turno?"Guardar cambios":"Iniciar turno";
@@ -472,7 +477,7 @@ $("btnGuardarTurno").onclick=function(){
   var v=$("t-vigilante").value.trim(),p=$("t-tip").value.trim();
   if(!v||!p){avisar("Nombre del vigilante y nº de TIP son obligatorios.");return}
   var aplicar=function(){
-    turno={vigilante:v,tip:p,servicio:$("t-servicio").value.trim(),turnoTrabajo:$("t-turno").value,horaInicio:$("t-inicio").value,horaFin:$("t-fin").value};
+    turno={vigilante:v,tip:p,servicio:$("t-servicio").value.trim(),turnoTrabajo:$("t-turno").value,fecha:$("t-fecha").value||hoyISO(),horaInicio:$("t-inicio").value,horaFin:$("t-fin").value};
     guardar("ps_turno",turno);
     ir("nuevo");
   };
@@ -700,8 +705,11 @@ function entradasDelParte(t){
   return partes.filter(function(p){return !p.tip||p.tip===t.tip})
                .sort(function(a,b){return a.id-b.id});
 }
-// La fecha del parte es la del primer registro; si no hay, la de hoy.
+// La fecha del parte la fija el vigilante al iniciar turno (los turnos de
+// noche cruzan la medianoche). Si falta, se usa la del primer registro.
 function fechaDelParte(crono){
+  var t=turno||{};
+  if(t.fecha){var x=t.fecha.split("-");return x[2]+"/"+x[1]+"/"+x[0]}
   return fechaCorta(crono.length?crono[0].fecha:new Date().toISOString());
 }
 function pintarInforme(){
