@@ -116,6 +116,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:var(--ambar)}
   background:none;border:none;color:var(--apagado);font-size:14px;
   text-decoration:underline;cursor:pointer;padding:6px;
 }
+.enlace-fin{align-self:flex-end;padding:2px 0;font-size:13px}
 .formulario{display:flex;flex-direction:column;gap:14px}
 .campo{display:flex;flex-direction:column;gap:6px;flex:1}
 .campo label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--apagado)}
@@ -218,7 +219,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <span class="chapa" aria-hidden="true"></span>
     <div>
       <h1>Parte de servicio</h1>
-      <p class="sub">Registro del turno · v2.5</p>
+      <p class="sub">Registro del turno · v2.6</p>
     </div>
   </div>
   <div class="estado">
@@ -267,7 +268,8 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
 <!-- REVISAR -->
 <main id="v-revisar" class="formulario oculto">
   <p class="guia" id="guiaRevisar">Revisa el texto, ajusta la hora si hace falta y guarda.</p>
-  <div class="campo"><label>Texto de la entrada</label><textarea id="e-texto" rows="6" placeholder="Qué ha ocurrido y qué se ha hecho"></textarea></div>
+  <div class="campo"><label>Texto de la entrada</label><textarea id="e-texto" rows="6" placeholder="Qué ha ocurrido y qué se ha hecho"></textarea>
+    <button class="enlace enlace-fin" id="btnCorregir">Corregir espaciado</button></div>
   <div class="fila">
     <div class="campo"><label>Hora</label><input id="e-hora" type="time"></div>
     <div class="campo"><label>Incidencia (opcional)</label><select id="e-tipo"></select></div>
@@ -556,6 +558,56 @@ $("btnGuardarEntrada").onclick=function(){
   editId=null;
   guardar("ps_partes",partes);
   ir("historial");
+};
+
+// ---------- corrector de espaciado ----------
+// Solo toca espacios alrededor de la puntuación. Nunca cambia palabras,
+// mayúsculas, tildes ni la estructura del texto. Se ejecuta únicamente
+// al pulsar el botón: no corrige al guardar ni mientras se escribe.
+function limpiarEspaciado(txt){
+  var n={dobles:0,antes:0,tras:0,parent:0,finLinea:0};
+  if(!txt)return{t:txt||"",n:n,total:0};
+  var lineas=String(txt).replace(/\r/g,"").split("\n").map(function(l){
+    /* línea compuesta solo de espacios -> línea en blanco */
+    if(/^[ \t]+$/.test(l)){n.finLinea++;return ""}
+    /* la sangría inicial se respeta: la forma del cuerpo es del vigilante */
+    var sang=/^[ \t]*/.exec(l)[0];
+    var t=l.slice(sang.length);
+    /* espacios al final de línea (antes de nada, para no contarlos dos veces) */
+    var rec=t.replace(/[ \t]+$/,"");
+    if(rec!==t){n.finLinea++;t=rec}
+    /* espacios dobles o más -> uno */
+    t=t.replace(/ {2,}/g,function(){n.dobles++;return " "});
+    /* espacio antes de , . ; : ! ? -> fuera */
+    t=t.replace(/ +([,.;:!?])/g,function(m,g){n.antes++;return g});
+    /* falta espacio tras , y ; cuando sigue letra */
+    t=t.replace(/([,;])(?=[A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/g,function(m,g){n.tras++;return g+" "});
+    /* falta espacio tras : solo entre letras (no rompe 09:15h) */
+    t=t.replace(/([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]):(?=[A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/g,function(m,g){n.tras++;return g+": "});
+    /* falta espacio tras punto solo si sigue mayúscula (no rompe 09.15h, dival.es, nº5.) */
+    t=t.replace(/([A-Za-zÁÉÍÓÚÜÑáéíóúüñ])\.(?=[A-ZÁÉÍÓÚÑ])/g,function(m,g){n.tras++;return g+". "});
+    /* espacios pegados por dentro de los paréntesis */
+    t=t.replace(/\( +/g,function(){n.parent++;return "("});
+    t=t.replace(/ +\)/g,function(){n.parent++;return ")"});
+    return sang+t;
+  });
+  var total=n.dobles+n.antes+n.tras+n.parent+n.finLinea;
+  return{t:lineas.join("\n"),n:n,total:total};
+}
+function resumenLimpieza(n){
+  var p=[];
+  if(n.dobles)p.push(n.dobles+" espacio(s) doble(s)");
+  if(n.antes)p.push(n.antes+" espacio(s) antes de puntuación");
+  if(n.tras)p.push(n.tras+" espacio(s) añadido(s) tras puntuación");
+  if(n.parent)p.push(n.parent+" espacio(s) en paréntesis");
+  if(n.finLinea)p.push(n.finLinea+" línea(s) con espacios al final");
+  return p.join(" · ");
+}
+$("btnCorregir").onclick=function(){
+  var r=limpiarEspaciado($("e-texto").value);
+  if(!r.total){avisar("No hay nada que corregir: el espaciado ya está limpio.");return}
+  $("e-texto").value=r.t;
+  avisar("Corregido → "+resumenLimpieza(r.n));
 };
 
 // ---------- historial ----------
