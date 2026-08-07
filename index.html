@@ -78,6 +78,7 @@ main{flex:1;padding:20px 18px 95px;overflow-y:auto}
   cursor:pointer;transition:transform .1s;
 }
 .ptt:active{transform:scale(.96)}
+.ptt.apagado{opacity:.4}
 .ptt-icono{font-size:34px;line-height:1}
 .ptt-texto{
   font-family:ui-monospace,Menlo,monospace;font-size:12px;
@@ -222,7 +223,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <span class="chapa" aria-hidden="true"></span>
     <div>
       <h1>Parte de servicio</h1>
-      <p class="sub">Registro del turno · v2.8</p>
+      <p class="sub">Registro del turno · v2.9</p>
     </div>
   </div>
   <div class="estado">
@@ -491,16 +492,32 @@ $("btnGuardarTurno").onclick=function(){
 };
 
 // ---------- dictado (micrófono directo) ----------
+// El reconocimiento del navegador se procesa en los servidores de Google:
+// sin conexión no funciona. Por eso siempre queda el cuadro de texto con
+// el micrófono del teclado, que sí trabaja sin cobertura.
 var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 if(!SR){$("ptt").classList.add("oculto")}
-var baseDictado="";
+var baseDictado="", ultimaVoz=0, avisadoSilencio=false, vigia=null, wakeLock=null, reintentos=0;
+
+// Consolida en memoria lo que ya se ve en pantalla, para que ninguna
+// sesión cortada a medias se lleve por delante lo dictado.
+function consolidar(){baseDictado=$("txtDictado").value.trim()}
+
 $("ptt").onclick=function(){
   if(escuchando){pararDictado();return}
-  baseDictado=$("txtDictado").value.trim();
+  if(!navigator.onLine){
+    avisar("Sin conexión: el botón de dictado necesita internet. Escribe abajo con el micrófono del teclado.");
+    return;
+  }
+  consolidar();
   if(!baseDictado)horaCaptura=ahora();
-  escuchando=true;pintarPTT();avisar("");
+  escuchando=true;reintentos=0;avisadoSilencio=false;ultimaVoz=Date.now();
+  pintarPTT();avisar("");
+  mantenerPantalla();
+  arrancarVigia();
   iniciarSesionVoz();
 };
+
 function iniciarSesionVoz(){
   rec=new SR();
   rec.lang="es-ES";
@@ -511,31 +528,102 @@ function iniciarSesionVoz(){
     var ultimo=ev.results[ev.results.length-1];
     var frase=ultimo[0].transcript.replace(/\s+/g," ").trim();
     $("txtDictado").value=(baseDictado?baseDictado+" ":"")+frase;
-    if(ultimo.isFinal){
-      baseDictado=$("txtDictado").value.trim();
-    }
-    actualizarBtn();
+    ultimaVoz=Date.now();avisadoSilencio=false;reintentos=0;
+    if(ultimo.isFinal)consolidar();
+    actualizarBtn();guardarBorrador();
   };
   rec.onerror=function(ev){
     if(ev.error==="no-speech"||ev.error==="aborted")return; // el reenganche lo hace onend
-    escuchando=false;pintarPTT();
+    if(ev.error==="network"&&escuchando){
+      pararDictado();
+      avisar("Se ha perdido la conexión. Lo dictado hasta ahora se conserva; sigue con el micrófono del teclado.");
+      return;
+    }
+    pararDictado();
     var m={"not-allowed":"Permiso de micrófono denegado. Actívalo en los ajustes del navegador o dicta con el teclado.",
-      "network":"El reconocimiento necesita conexión."};
+      "service-not-allowed":"El navegador ha bloqueado el micrófono. Dicta con el micrófono del teclado.",
+      "audio-capture":"No se encuentra el micrófono. ¿Lo está usando otra aplicación?"};
     avisar(m[ev.error]||"Fallo del micrófono ("+ev.error+"). Dicta con el micrófono del teclado.");
   };
   rec.onend=function(){
-    if(escuchando)iniciarSesionVoz(); // sigue escuchando hasta que pulses TERMINAR
+    consolidar();                       // nada de lo dicho se pierde al cerrar la sesión
+    if(!escuchando)return;
+    // Chrome rechaza el arranque si se reengancha al instante: se deja un respiro.
+    setTimeout(function(){if(escuchando)iniciarSesionVoz()},300);
   };
-  try{rec.start()}catch(e){escuchando=false;pintarPTT();avisar("No se pudo iniciar el micrófono.")}
+  try{
+    rec.start();
+  }catch(e){
+    reintentos++;
+    if(reintentos>3){pararDictado();avisar("No se pudo reanudar el micrófono. Vuelve a pulsar el botón o escribe a mano.");return}
+    setTimeout(function(){if(escuchando)iniciarSesionVoz()},500);
+  }
 }
-function pararDictado(){escuchando=false;if(rec){rec.onend=null;rec.stop()}pintarPTT()}
+
+function pararDictado(){
+  escuchando=false;
+  if(rec){rec.onend=null;try{rec.stop()}catch(e){}}
+  pararVigia();soltarPantalla();
+  consolidar();guardarBorrador();
+  pintarPTT();
+}
+
+// Vigía de silencio: si el móvil deja de escuchar sin decir nada, avisa.
+function arrancarVigia(){
+  pararVigia();
+  vigia=setInterval(function(){
+    if(!escuchando)return;
+    if(!avisadoSilencio&&Date.now()-ultimaVoz>9000){
+      avisadoSilencio=true;
+      avisar("No se está captando voz. Acerca el micrófono, comprueba el permiso o escribe con el teclado.");
+    }
+  },2000);
+}
+function pararVigia(){if(vigia){clearInterval(vigia);vigia=null}}
+
+// Mantiene la pantalla encendida mientras se dicta: si se apaga,
+// el reconocimiento muere en silencio y el botón se queda en rojo.
+function mantenerPantalla(){
+  if(!("wakeLock" in navigator))return;
+  navigator.wakeLock.request("screen").then(function(w){wakeLock=w}).catch(function(){});
+}
+function soltarPantalla(){
+  if(wakeLock){try{wakeLock.release()}catch(e){}wakeLock=null}
+}
+// Si el móvil se bloquea o se cambia de app, se corta limpio en vez de fingir que escucha.
+document.addEventListener("visibilitychange",function(){
+  if(document.hidden&&escuchando){
+    pararDictado();
+    avisar("Dictado detenido al salir de la pantalla. Lo dictado se ha guardado.");
+  }
+});
+
+// Borrador: lo que hay en el cuadro sobrevive aunque se cierre la app.
+function guardarBorrador(){
+  var t=$("txtDictado").value;
+  if(t.trim())guardar("ps_borrador",{texto:t,hora:horaCaptura});
+  else localStorage.removeItem("ps_borrador");
+}
+function borrarBorrador(){localStorage.removeItem("ps_borrador")}
+function recuperarBorrador(){
+  var b=cargar("ps_borrador",null);
+  if(!b||!b.texto||$("txtDictado").value.trim())return;
+  $("txtDictado").value=b.texto;
+  horaCaptura=b.hora||ahora();
+  actualizarBtn();
+  avisar("Se ha recuperado lo que estabas dictando.");
+}
+
 function pintarPTT(){
   var b=$("ptt");
   b.classList.toggle("escuchando",escuchando);
   $("pttIcono").textContent=escuchando?"■":"🎙";
   $("pttTexto").textContent=escuchando?"TERMINAR":"DICTAR";
 }
-$("txtDictado").oninput=function(){if(this.value.trim()&&!horaCaptura)horaCaptura=ahora();actualizarBtn()};
+$("txtDictado").oninput=function(){
+  if(this.value.trim()&&!horaCaptura)horaCaptura=ahora();
+  consolidar();actualizarBtn();guardarBorrador();
+};
 function actualizarBtn(){$("btnRedactar").disabled=!$("txtDictado").value.trim()}
 
 // ---------- añadir al parte ----------
@@ -544,7 +632,7 @@ $("btnRedactar").onclick=function(){
   var texto=$("txtDictado").value.trim();
   if(!texto)return;
   abrirRevisar({hora:horaCaptura||ahora(),tipo:"",texto:texto},null);
-  $("txtDictado").value="";horaCaptura="";actualizarBtn();
+  $("txtDictado").value="";horaCaptura="";baseDictado="";actualizarBtn();borrarBorrador();
 };
 $("btnManual").onclick=function(){abrirRevisar({hora:ahora(),tipo:"",texto:""},null)};
 
@@ -773,6 +861,7 @@ function arrancar(){
 function seguirArranque(){
   ir(turno?"nuevo":"turno");
   pintarHistorial();
+  recuperarBorrador();
 }
 arrancar();
 
@@ -784,7 +873,10 @@ if("serviceWorker" in navigator){
     navigator.serviceWorker.register("./sw.js").catch(function(){});
   });
 }
-function pintarRed(){$("sinRed").classList.toggle("oculto",navigator.onLine)}
+function pintarRed(){
+  $("sinRed").classList.toggle("oculto",navigator.onLine);
+  $("ptt").classList.toggle("apagado",!navigator.onLine);
+}
 window.addEventListener("online",pintarRed);
 window.addEventListener("offline",pintarRed);
 pintarRed();
