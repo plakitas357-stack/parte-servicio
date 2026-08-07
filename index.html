@@ -71,61 +71,29 @@ main{flex:1;padding:20px 18px 95px;overflow-y:auto}
 
 /* pantalla nuevo */
 .centro{display:flex;flex-direction:column;align-items:center;gap:16px}
-.ptt{
-  position:relative;width:150px;height:150px;border-radius:50%;
-  border:2px solid var(--linea);background:var(--panel);color:var(--texto);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
-  cursor:pointer;transition:transform .1s;
+.acciones .secundario{white-space:nowrap}
+
+/* hoja de frases rápidas */
+.hoja{position:fixed;inset:0;z-index:55;background:rgba(6,9,13,.7);display:flex;align-items:flex-end}
+.hoja-caja{
+  width:100%;max-width:520px;margin:0 auto;max-height:78vh;
+  background:var(--panel);border-top:1px solid var(--linea);
+  border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;gap:12px;
 }
-.ptt:active{transform:scale(.96)}
-.ptt.apagado{opacity:.4}
-.ptt-icono{font-size:34px;line-height:1}
-.ptt-texto{
-  font-family:ui-monospace,Menlo,monospace;font-size:12px;
-  letter-spacing:.16em;color:var(--ambar);
-}
-.anillo{position:absolute;inset:-12px;border-radius:50%;border:2px solid var(--rojo);opacity:0}
-.ptt.escuchando{border-color:var(--rojo)}
-.ptt.escuchando .ptt-texto{color:var(--rojo)}
-.ptt.escuchando .anillo{opacity:1;animation:pulso 1.4s ease-out infinite}
-@keyframes pulso{0%{transform:scale(.92);opacity:.9}100%{transform:scale(1.12);opacity:0}}
-@media (prefers-reduced-motion:reduce){.anillo{animation:none;opacity:.6}}
-.canal{
-  width:100%;background:var(--panel);border:1px solid var(--linea);
-  border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;
-}
-.canal-titulo{
-  font-family:ui-monospace,Menlo,monospace;font-size:12px;
-  letter-spacing:.22em;text-transform:uppercase;color:var(--ambar);text-align:center;
-}
-textarea,input,select{
+.hoja-cab{display:flex;justify-content:space-between;align-items:center}
+.hoja-titulo{font-size:15px;font-weight:700}
+.hoja-lista{overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.frase{
   background:var(--fondo);border:1px solid var(--linea);border-radius:10px;
-  color:var(--texto);padding:12px 13px;font-size:16px;width:100%;
-  font-family:inherit;resize:vertical;line-height:1.55;
+  padding:11px 13px;text-align:left;color:var(--texto);cursor:pointer;
+  display:flex;flex-direction:column;gap:4px;width:100%;
 }
-textarea:focus,input:focus,select:focus{outline:none;border-color:var(--ambar)}
-.primario{
-  background:var(--ambar);color:#161200;border:none;
-  padding:14px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;width:100%;
+.frase-lbl{font-size:14.5px;font-weight:600}
+.frase-txt{
+  font-size:12px;color:var(--apagado);line-height:1.4;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
-.primario:disabled{opacity:.4}
-.secundario{
-  background:none;border:1px solid var(--linea);color:var(--texto);
-  padding:12px 20px;border-radius:10px;font-size:15px;cursor:pointer;
-}
-.enlace{
-  background:none;border:none;color:var(--apagado);font-size:14px;
-  text-decoration:underline;cursor:pointer;padding:6px;
-}
-.enlace-fin{align-self:flex-end;padding:2px 0;font-size:13px}
-.pista{font-size:12px;color:var(--apagado);line-height:1.4}
-.formulario{display:flex;flex-direction:column;gap:14px}
-.campo{display:flex;flex-direction:column;gap:6px;flex:1}
-.campo label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--apagado)}
-.campo input,.campo select,.campo textarea{background:var(--panel)}
-.fila{display:flex;gap:12px}
-.acciones{display:flex;gap:12px;margin-top:6px}
-.acciones .primario{flex:1;width:auto}
 
 /* historial */
 .historial{display:flex;flex-direction:column;gap:14px}
@@ -205,7 +173,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
 .inf-vacio{color:#555;font-style:italic}
 
 @media print{
-  header.cab,.chip-turno,.aviso,.banda-pruebas,.modal,nav,.no-print{display:none !important}
+  header.cab,.chip-turno,.aviso,.banda-pruebas,.modal,.hoja,nav,.no-print{display:none !important}
   body{background:#fff}
   .app{max-width:none}
   main{padding:0;overflow:visible}
@@ -223,7 +191,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <span class="chapa" aria-hidden="true"></span>
     <div>
       <h1>Parte de servicio</h1>
-      <p class="sub">Registro del turno · v3.2</p>
+      <p class="sub">Registro del turno · v3.3</p>
     </div>
   </div>
   <div class="estado">
@@ -257,19 +225,14 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
 </main>
 
 <!-- NUEVO -->
-<main id="v-nuevo" class="centro oculto">
-  <button class="ptt" id="ptt">
-    <span class="anillo" aria-hidden="true"></span>
-    <span class="ptt-icono" id="pttIcono">🎙</span>
-    <span class="ptt-texto" id="pttTexto">DICTAR</span>
-  </button>
-  <div class="canal">
-    <p class="canal-titulo">Registro del turno</p>
-    <p class="guia" id="guiaNuevo">Pulsa el botón y dicta la novedad, o escribe en el cuadro: rondas, relevos, controles o incidencias.</p>
-    <textarea id="txtDictado" rows="5" placeholder="«Las 23:00, primera ronda por planta baja y sótano, todo correcto…»"></textarea>
+<main id="v-nuevo" class="formulario oculto">
+  <p class="guia" id="guiaNuevo">Escribe la novedad, o dicta con el micrófono del teclado. Las frases rápidas rellenan lo de siempre.</p>
+  <div class="campo"><label>Registro del turno</label>
+    <textarea id="txtEntrada" rows="8" placeholder="Rondas, relevos, controles o incidencias…"></textarea></div>
+  <div class="acciones">
+    <button class="secundario" id="btnFrases">Frases</button>
     <button class="primario" id="btnRedactar" disabled>Añadir al parte</button>
   </div>
-  <button class="enlace" id="btnManual">Escribir la entrada a mano</button>
 </main>
 
 <!-- REVISAR -->
@@ -323,6 +286,18 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
 </nav>
 </div>
 
+<!-- FRASES RÁPIDAS -->
+<div class="hoja oculto" id="hojaFrases">
+  <div class="hoja-caja">
+    <div class="hoja-cab">
+      <p class="hoja-titulo">Frases rápidas</p>
+      <button class="mini" id="cerrarFrases">Cerrar</button>
+    </div>
+    <input id="buscarFrase" placeholder="Buscar frase…" autocomplete="off">
+    <div class="hoja-lista" id="listaFrases"></div>
+  </div>
+</div>
+
 <!-- MODAL PIN -->
 <div class="modal oculto" id="modal">
   <div class="modal-caja">
@@ -354,7 +329,7 @@ var PIN_PRUEBAS  = "6969";
 var TIPOS=["Intrusión","Hurto / robo","Daños","Salto de alarma","Emergencia / accidente","Control de accesos","Otros"];
 var turno=null, partes=[], archivo=[], pins={}, maestro=null;
 var informeSel=null;   // null = turno en curso; si no, índice del turno archivado
-var editId=null, escuchando=false, rec=null, horaCaptura="";
+var editId=null, horaCaptura="";
 
 function cargar(k,def){try{var v=localStorage.getItem(k);return v?JSON.parse(v):def}catch(e){return def}}
 function guardar(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){
@@ -499,7 +474,7 @@ function cerrarTurno(){
   turno=null;guardar("ps_turno",null);
   // Lo que el saliente dejó dictado a medias no puede aparecer en la
   // pantalla del entrante ni acabar firmado con su nombre.
-  $("txtDictado").value="";baseDictado="";horaCaptura="";
+  $("txtEntrada").value="";horaCaptura="";
   borrarBorrador();actualizarBtn();
   informeSel=null;
 }
@@ -530,150 +505,117 @@ $("btnGuardarTurno").onclick=function(){
   asegurarPin(p,entrar);                                  // TIP nuevo: se crea su PIN
 };
 
-// ---------- dictado (micrófono directo) ----------
-// El reconocimiento del navegador se procesa en los servidores de Google:
-// sin conexión no funciona. Por eso siempre queda el cuadro de texto con
-// el micrófono del teclado, que sí trabaja sin cobertura.
-var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-if(!SR){$("ptt").classList.add("oculto")}
-var baseDictado="", ultimaVoz=0, avisadoSilencio=false, vigia=null, wakeLock=null, reintentos=0;
+// ---------- frases rápidas ----------
+// Catálogo del servicio. {H} es la hora de inserción; [entre corchetes]
+// son huecos que rellena el vigilante. La app pone la hora en su campo,
+// así que el "{H}h-" del principio se quita al insertar.
+var FRASES=[
+ {id:"ini1",lbl:"▶ Inicio (1 compañero)",
+  t:"{H}h-Inicio servicio relevando al compañero V.S [nombre apellido apellido] con NºTIP [00000], recibiendo las novedades del servicio."},
+ {id:"ini2",lbl:"▶ Inicio (2 compañeros)",
+  t:"{H}h-Inicio servicio relevando a los compañeros V.S [nombre apellido apellido] con NºTIP [00000], y el compañero V.S [nombre apellido apellido] con NºTIP [00000], recibiendo las novedades del servicio."},
+ {id:"fin1",lbl:"■ Fin (1 relevo)",
+  t:"{H}h-Finalizo servicio siendo relevado por el compañero V.S [nombre apellido apellido] con NºTIP [00000], dándole las novedades del servicio."},
+ {id:"fin2",lbl:"■ Fin (2 relevos)",
+  t:"{H}h-Finalizo servicio siendo relevado por los compañeros V.S [nombre apellido apellido] con NºTIP [00000], y el compañero V.S [nombre apellido apellido] con NºTIP [00000], dándoles las novedades del servicio."},
+ {id:"emp",lbl:"🏢 Acceso empresa",
+  t:"{H}h-Accede al edificio [nombre apellido apellido], de la empresa [empresa], para realizar [trabajo] en [zona]. Autorizado por [nombre apellido apellido] mediante correo electrónico recibido el [dd/mm/aaaa] de [remitente]. Se informa al Centro de Coordinación."},
+ {id:"empv",lbl:"🏢 Acceso empresa (verbal)",
+  t:"{H}h-Accede al edificio [nombre apellido apellido], de la empresa [empresa], para realizar [trabajo] en [zona]. Autoriza el acceso de forma verbal [nombre apellido apellido], al no disponerse de autorización escrita. Se informa al Centro de Coordinación."},
+ {id:"emps",lbl:"🏢 Salida empresa",
+  t:"{H}h-Finaliza los trabajos y abandona el edificio [nombre apellido apellido], de la empresa [empresa]."},
+ {id:"apert",lbl:"🚪 Apertura salidas de emergencia",
+  t:"{H}h-Realizamos apertura de:\n-  Portón del acceso oeste del Palacio de Scala para habilitar la salida de emergencia.\n-  Puerta de acceso al Parking para habilitar la salida de emergencia."},
+ {id:"acomp",lbl:"👤 Acompañamiento funcionario",
+  t:"{H}h-Acompañamos a la funcionaria del departamento de [departamento], desalarmamos la zona y dejamos abierta la puerta principal."},
+ {id:"vspue",lbl:"🛡 Inicio V.S. en puesto",
+  t:"{H}h-Abre e inicia servicio en el Registro General la vigilante de seguridad [nombre apellido apellido] T.I.P. [000000]."},
+ {id:"ronda",lbl:"🔦 Ronda general de instalaciones",
+  t:"{H}h-Inicio ronda general de instalaciones.\nA las [00:00]h finalizo ronda general de instalaciones cerrando las siguientes instalaciones:\nPLANTA BAJA Y ENTRESUELO:\nPRIMERA PLANTA:\nSEGUNDA PLANTA:\nTERCERA PLANTA:"},
+ {id:"nota",lbl:"(*) Nota fija de servicio",
+  t:"(*) Durante el servicio se efectúa control de acceso, custodia de llaves, control de paquetería y vigilancia de las instalaciones mediante CCTV."}
+];
 
-// Consolida en memoria lo que ya se ve en pantalla, para que ninguna
-// sesión cortada a medias se lleve por delante lo dictado.
-function consolidar(){baseDictado=$("txtDictado").value.trim()}
-
-$("ptt").onclick=function(){
-  if(escuchando){pararDictado();return}
-  if(!navigator.onLine){
-    avisar("Sin conexión: el botón de dictado necesita internet. Escribe abajo con el micrófono del teclado.");
-    return;
-  }
-  consolidar();
-  if(!baseDictado)horaCaptura=ahora();
-  escuchando=true;reintentos=0;avisadoSilencio=false;ultimaVoz=Date.now();
-  pintarPTT();avisar("");
-  mantenerPantalla();
-  arrancarVigia();
-  iniciarSesionVoz();
+$("btnFrases").onclick=function(){
+  $("buscarFrase").value="";
+  pintarFrases();
+  $("hojaFrases").classList.remove("oculto");
 };
+$("cerrarFrases").onclick=function(){$("hojaFrases").classList.add("oculto")};
+$("hojaFrases").onclick=function(ev){if(ev.target===this)this.classList.add("oculto")};
+$("buscarFrase").oninput=pintarFrases;
 
-function iniciarSesionVoz(){
-  rec=new SR();
-  rec.lang="es-ES";
-  rec.continuous=false;      // sesiones cortas: evita el eco acumulativo de Android
-  rec.interimResults=true;
-  rec.onresult=function(ev){
-    // solo se toma la última versión de la frase en curso, nunca se suman fragmentos
-    var ultimo=ev.results[ev.results.length-1];
-    var frase=ultimo[0].transcript.replace(/\s+/g," ").trim();
-    $("txtDictado").value=(baseDictado?baseDictado+" ":"")+frase;
-    ultimaVoz=Date.now();avisadoSilencio=false;reintentos=0;
-    if(ultimo.isFinal)consolidar();
-    actualizarBtn();guardarBorrador();
-  };
-  rec.onerror=function(ev){
-    if(ev.error==="no-speech"||ev.error==="aborted")return; // el reenganche lo hace onend
-    if(ev.error==="network"&&escuchando){
-      pararDictado();
-      avisar("Se ha perdido la conexión. Lo dictado hasta ahora se conserva; sigue con el micrófono del teclado.");
-      return;
-    }
-    pararDictado();
-    var m={"not-allowed":"Permiso de micrófono denegado. Actívalo en los ajustes del navegador o dicta con el teclado.",
-      "service-not-allowed":"El navegador ha bloqueado el micrófono. Dicta con el micrófono del teclado.",
-      "audio-capture":"No se encuentra el micrófono. ¿Lo está usando otra aplicación?"};
-    avisar(m[ev.error]||"Fallo del micrófono ("+ev.error+"). Dicta con el micrófono del teclado.");
-  };
-  rec.onend=function(){
-    consolidar();                       // nada de lo dicho se pierde al cerrar la sesión
-    if(!escuchando)return;
-    // Chrome rechaza el arranque si se reengancha al instante: se deja un respiro.
-    setTimeout(function(){if(escuchando)iniciarSesionVoz()},300);
-  };
-  try{
-    rec.start();
-  }catch(e){
-    reintentos++;
-    if(reintentos>3){pararDictado();avisar("No se pudo reanudar el micrófono. Vuelve a pulsar el botón o escribe a mano.");return}
-    setTimeout(function(){if(escuchando)iniciarSesionVoz()},500);
-  }
+function pintarFrases(){
+  var q=$("buscarFrase").value.trim().toLowerCase();
+  var lista=FRASES.filter(function(f){
+    return !q||f.lbl.toLowerCase().indexOf(q)>-1||f.t.toLowerCase().indexOf(q)>-1;
+  });
+  $("listaFrases").innerHTML=lista.map(function(f){
+    return '<button class="frase" data-f="'+f.id+'">'+
+      '<span class="frase-lbl">'+esc(f.lbl)+'</span>'+
+      '<span class="frase-txt">'+esc(sinMarcaHora(f.t).replace(/\n/g," "))+'</span></button>';
+  }).join("")||'<p class="guia">Ninguna frase coincide.</p>';
+  $("listaFrases").querySelectorAll("[data-f]").forEach(function(b){
+    b.onclick=function(){insertarFrase(b.dataset.f)};
+  });
 }
 
-function pararDictado(){
-  escuchando=false;
-  if(rec){rec.onend=null;try{rec.stop()}catch(e){}}
-  pararVigia();soltarPantalla();
-  consolidar();guardarBorrador();
-  pintarPTT();
+// La hora del principio la pone el informe, no el texto de la entrada.
+function sinMarcaHora(t){return String(t||"").replace(/^\{H\}h-\s*/,"")}
+
+function insertarFrase(id){
+  var f=FRASES.filter(function(x){return x.id===id})[0];
+  if(!f)return;
+  var ta=$("txtEntrada");
+  var texto=sinMarcaHora(f.t).replace(/\{H\}/g,ahora());
+  var val=ta.value;
+  var pos=(typeof ta.selectionStart==="number")?ta.selectionStart:val.length;
+  var antes=val.slice(0,pos), despues=val.slice(pos);
+  // la frase siempre empieza en línea propia y no se pega a la siguiente
+  if(antes&&!/\n$/.test(antes))antes+="\n";
+  var ins=texto+((despues&&!/^\n/.test(despues))?"\n":"");
+  ta.value=antes+ins+despues;
+  if(!horaCaptura)horaCaptura=ahora();
+  $("hojaFrases").classList.add("oculto");
+  // deja seleccionado el primer hueco para escribir encima
+  var base=antes.length;
+  var a=ta.value.indexOf("[",base), b=a>-1?ta.value.indexOf("]",a):-1;
+  ta.focus();
+  if(a>-1&&b>-1)ta.setSelectionRange(a,b+1);
+  else ta.setSelectionRange(base+texto.length,base+texto.length);
+  actualizarBtn();guardarBorrador();
 }
 
-// Vigía de silencio: si el móvil deja de escuchar sin decir nada, avisa.
-function arrancarVigia(){
-  pararVigia();
-  vigia=setInterval(function(){
-    if(!escuchando)return;
-    if(!avisadoSilencio&&Date.now()-ultimaVoz>9000){
-      avisadoSilencio=true;
-      avisar("No se está captando voz. Acerca el micrófono, comprueba el permiso o escribe con el teclado.");
-    }
-  },2000);
-}
-function pararVigia(){if(vigia){clearInterval(vigia);vigia=null}}
-
-// Mantiene la pantalla encendida mientras se dicta: si se apaga,
-// el reconocimiento muere en silencio y el botón se queda en rojo.
-function mantenerPantalla(){
-  if(!("wakeLock" in navigator))return;
-  navigator.wakeLock.request("screen").then(function(w){wakeLock=w}).catch(function(){});
-}
-function soltarPantalla(){
-  if(wakeLock){try{wakeLock.release()}catch(e){}wakeLock=null}
-}
-// Si el móvil se bloquea o se cambia de app, se corta limpio en vez de fingir que escucha.
-document.addEventListener("visibilitychange",function(){
-  if(document.hidden&&escuchando){
-    pararDictado();
-    avisar("Dictado detenido al salir de la pantalla. Lo dictado se ha guardado.");
-  }
-});
-
-// Borrador: lo que hay en el cuadro sobrevive aunque se cierre la app.
+// ---------- borrador ----------
+// Lo que hay en el cuadro sobrevive aunque se cierre la app.
 function guardarBorrador(){
-  var t=$("txtDictado").value;
+  var t=$("txtEntrada").value;
   if(t.trim())guardar("ps_borrador",{texto:t,hora:horaCaptura});
   else localStorage.removeItem("ps_borrador");
 }
 function borrarBorrador(){localStorage.removeItem("ps_borrador")}
 function recuperarBorrador(){
   var b=cargar("ps_borrador",null);
-  if(!b||!b.texto||$("txtDictado").value.trim())return;
-  $("txtDictado").value=b.texto;
+  if(!b||!b.texto||$("txtEntrada").value.trim())return;
+  $("txtEntrada").value=b.texto;
   horaCaptura=b.hora||ahora();
   actualizarBtn();
-  avisar("Se ha recuperado lo que estabas dictando.");
+  avisar("Se ha recuperado la entrada que estabas escribiendo.");
 }
 
-function pintarPTT(){
-  var b=$("ptt");
-  b.classList.toggle("escuchando",escuchando);
-  $("pttIcono").textContent=escuchando?"■":"🎙";
-  $("pttTexto").textContent=escuchando?"TERMINAR":"DICTAR";
-}
-$("txtDictado").oninput=function(){
+$("txtEntrada").oninput=function(){
   if(this.value.trim()&&!horaCaptura)horaCaptura=ahora();
-  consolidar();actualizarBtn();guardarBorrador();
+  actualizarBtn();guardarBorrador();
 };
-function actualizarBtn(){$("btnRedactar").disabled=!$("txtDictado").value.trim()}
+function actualizarBtn(){$("btnRedactar").disabled=!$("txtEntrada").value.trim()}
 
 // ---------- añadir al parte ----------
 $("btnRedactar").onclick=function(){
-  if(escuchando)pararDictado();
-  var texto=$("txtDictado").value.trim();
+  var texto=$("txtEntrada").value.trim();
   if(!texto)return;
   abrirRevisar({hora:horaCaptura||ahora(),tipo:"",texto:texto},null);
-  $("txtDictado").value="";horaCaptura="";baseDictado="";actualizarBtn();borrarBorrador();
+  $("txtEntrada").value="";horaCaptura="";actualizarBtn();borrarBorrador();
 };
-$("btnManual").onclick=function(){abrirRevisar({hora:ahora(),tipo:"",texto:""},null)};
 
 // ---------- revisar / editar ----------
 var sel=$("e-tipo");
@@ -883,6 +825,8 @@ function entradasDelParte(t,lista){
   return (lista||partes).filter(function(p){return !p.tip||p.tip===t.tip})
     .slice()
     .sort(function(a,b){
+      var na=esNotaFija(a)?1:0, nb=esNotaFija(b)?1:0;
+      if(na!==nb)return na-nb;                  // la nota fija, siempre al final
       var ka=desdeInicio(t,a.hora), kb=desdeInicio(t,b.hora);
       if(ka===null||kb===null)return a.id-b.id;
       return ka-kb||a.id-b.id;
@@ -905,12 +849,16 @@ function fechaDelParte(crono){
 // Arregla el espaciado, junta los saltos de línea en un párrafo,
 // pone mayúscula inicial y cierra con punto.
 function normalizarTexto(txt){
-  var t=limpiarEspaciado(txt||"").t.replace(/\s*\n\s*/g," ").replace(/ {2,}/g," ").trim();
-  if(!t)return "";
-  t=t.charAt(0).toUpperCase()+t.slice(1);
-  if(!/[.!?\u2026]$/.test(t))t+=".";
-  return t;
+  var lineas=limpiarEspaciado(txt||"").t.split("\n").map(function(l){return l.trim()}).filter(Boolean);
+  if(!lineas.length)return [];
+  lineas[0]=lineas[0].charAt(0).toUpperCase()+lineas[0].slice(1);
+  // el punto final solo en las anotaciones de una línea: las de bloque
+  // (la ronda, la apertura) acaban en dos puntos a propósito
+  if(lineas.length===1&&!/[.!?:\u2026]$/.test(lineas[0]))lineas[0]+=".";
+  return lineas;
 }
+// La nota fija no es un hecho cronológico: va sin hora y al final del parte.
+function esNotaFija(p){return /^\s*\(\*\)/.test(p.texto||"")}
 function pintarInforme(){
   var d=datosInforme();
   var t=d.t;
@@ -931,8 +879,9 @@ function pintarInforme(){
     h+='<p class="inf-linea inf-vacio">Sin registros en este turno.</p>';
   }else{
     crono.forEach(function(p){
-      h+='<p class="inf-linea">'+esc(p.hora)+'h-'+
-         (p.tipo?esc(p.tipo.toUpperCase())+'. ':'')+esc(normalizarTexto(p.texto))+'</p>';
+      var lineas=normalizarTexto(p.texto).map(esc).join('<br>');
+      h+='<p class="inf-linea">'+(esNotaFija(p)?'':esc(p.hora)+'h-')+
+         (p.tipo?esc(p.tipo.toUpperCase())+'. ':'')+lineas+'</p>';
     });
   }
   $("informe").innerHTML=h;
@@ -995,10 +944,7 @@ if("serviceWorker" in navigator){
     navigator.serviceWorker.register("./sw.js").catch(function(){});
   });
 }
-function pintarRed(){
-  $("sinRed").classList.toggle("oculto",navigator.onLine);
-  $("ptt").classList.toggle("apagado",!navigator.onLine);
-}
+function pintarRed(){$("sinRed").classList.toggle("oculto",navigator.onLine)}
 window.addEventListener("online",pintarRed);
 window.addEventListener("offline",pintarRed);
 pintarRed();
