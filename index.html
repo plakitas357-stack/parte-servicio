@@ -223,7 +223,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <span class="chapa" aria-hidden="true"></span>
     <div>
       <h1>Parte de servicio</h1>
-      <p class="sub">Registro del turno · v3.0</p>
+      <p class="sub">Registro del turno · v3.2</p>
     </div>
   </div>
   <div class="estado">
@@ -497,6 +497,11 @@ function cerrarTurno(){
   guardar("ps_archivo",archivo);
   partes=[];guardar("ps_partes",partes);
   turno=null;guardar("ps_turno",null);
+  // Lo que el saliente dejó dictado a medias no puede aparecer en la
+  // pantalla del entrante ni acabar firmado con su nombre.
+  $("txtDictado").value="";baseDictado="";horaCaptura="";
+  borrarBorrador();actualizarBtn();
+  informeSel=null;
 }
 $("btnGuardarTurno").onclick=function(){
   var v=$("t-vigilante").value.trim(),p=$("t-tip").value.trim();
@@ -506,13 +511,23 @@ $("btnGuardarTurno").onclick=function(){
     guardar("ps_turno",turno);
     ir("nuevo");
   };
+  // Cambiar el TIP es un relevo aunque no se haya pulsado el botón: hay que
+  // archivar el turno del compañero o sus entradas acabarían firmadas por otro.
+  var entrar=function(){
+    if(turno&&turno.tip!==p){
+      if(!confirm("El turno abierto es de "+turno.vigilante+" (TIP "+turno.tip+").\n\n"+
+        "Al cambiar el TIP se cerrará su turno y sus "+partes.length+" entrada(s) se archivarán a su nombre. ¿Continuar?"))return;
+      cerrarTurno();
+    }
+    aplicar();
+  };
   if(turno&&turno.tip===p)return aplicar();               // mismo vigilante ajustando sus datos
   if(pins[p]){                                            // TIP ya conocido: hay que demostrar que eres tú
     pedirPin("PIN del vigilante","El TIP "+p+" ya tiene PIN en este móvil. Introdúcelo para iniciar turno.",
-      function(x){return pinValido(x,p)},aplicar);
+      function(x){return pinValido(x,p)},entrar);
     return;
   }
-  asegurarPin(p,aplicar);                                 // TIP nuevo: se crea su PIN
+  asegurarPin(p,entrar);                                  // TIP nuevo: se crea su PIN
 };
 
 // ---------- dictado (micrófono directo) ----------
@@ -886,6 +901,16 @@ function fechaDelParte(crono){
   if(t.fecha){var x=t.fecha.split("-");return x[2]+"/"+x[1]+"/"+x[0]}
   return fechaCorta(crono.length?crono[0].fecha:new Date().toISOString());
 }
+// Unifica el texto solo al imprimir: la entrada guardada no se toca.
+// Arregla el espaciado, junta los saltos de línea en un párrafo,
+// pone mayúscula inicial y cierra con punto.
+function normalizarTexto(txt){
+  var t=limpiarEspaciado(txt||"").t.replace(/\s*\n\s*/g," ").replace(/ {2,}/g," ").trim();
+  if(!t)return "";
+  t=t.charAt(0).toUpperCase()+t.slice(1);
+  if(!/[.!?\u2026]$/.test(t))t+=".";
+  return t;
+}
 function pintarInforme(){
   var d=datosInforme();
   var t=d.t;
@@ -906,8 +931,8 @@ function pintarInforme(){
     h+='<p class="inf-linea inf-vacio">Sin registros en este turno.</p>';
   }else{
     crono.forEach(function(p){
-      h+='<p class="inf-linea">'+esc(p.hora)+' h. '+
-         (p.tipo?esc(p.tipo.toUpperCase())+'. ':'')+esc(p.texto)+'</p>';
+      h+='<p class="inf-linea">'+esc(p.hora)+'h-'+
+         (p.tipo?esc(p.tipo.toUpperCase())+'. ':'')+esc(normalizarTexto(p.texto))+'</p>';
     });
   }
   $("informe").innerHTML=h;
@@ -952,6 +977,15 @@ function seguirArranque(){
   recuperarBorrador();
 }
 arrancar();
+
+// ---------- que Android no borre los partes ----------
+// Sin esto, el navegador puede vaciar los datos del sitio por su cuenta
+// cuando el móvil anda corto de espacio, y sin preguntar.
+if(navigator.storage&&navigator.storage.persist){
+  navigator.storage.persisted().then(function(ya){
+    if(!ya)return navigator.storage.persist();
+  }).catch(function(){});
+}
 
 // ---------- funcionamiento sin cobertura ----------
 // Guarda una copia de la app en el móvil. Los partes ya se
