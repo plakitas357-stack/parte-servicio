@@ -46,13 +46,13 @@ h1{font-size:17px;font-weight:700;letter-spacing:.02em}
   border-radius:20px;padding:2px 8px;white-space:nowrap;
 }
 .banda-pruebas{
-  margin:10px 18px 0;padding:8px 13px;border-radius:8px;
+  margin:10px 18px 0;padding:9px 14px;border-radius:12px;
   background:#2a1d10;border:1px dashed var(--ambar-osc);
   color:var(--ambar);font-size:12.5px;text-align:center;letter-spacing:.03em;
 }
 .chip-turno{
   display:flex;justify-content:space-between;align-items:center;gap:10px;
-  margin:10px 18px 0;padding:9px 13px;border-radius:9px;width:calc(100% - 36px);
+  margin:10px 18px 0;padding:11px 14px;border-radius:14px;width:calc(100% - 36px);
   background:var(--panel);border:1px solid var(--linea);color:var(--texto);
   font-size:13px;cursor:pointer;text-align:left;
 }
@@ -61,7 +61,7 @@ h1{font-size:17px;font-weight:700;letter-spacing:.02em}
   font-size:12.5px;white-space:nowrap;
 }
 .aviso{
-  margin:12px 18px 0;padding:10px 14px;border-radius:8px;
+  margin:12px 18px 0;padding:11px 15px;border-radius:12px;
   background:#2a1d10;border:1px solid var(--ambar-osc);
   color:var(--ambar);font-size:13.5px;
 }
@@ -69,24 +69,66 @@ main{flex:1;padding:20px 18px 95px;overflow-y:auto}
 .guia{color:var(--apagado);font-size:14px;line-height:1.5;text-align:center;margin-bottom:8px}
 .oculto{display:none !important}
 
-/* pantalla nuevo */
-.centro{display:flex;flex-direction:column;align-items:center;gap:16px}
+/* controles de formulario */
+textarea,input,select{
+  background:var(--panel);border:1px solid var(--linea);border-radius:14px;
+  color:var(--texto);padding:13px 15px;font-size:16px;width:100%;
+  font-family:inherit;line-height:1.6;resize:vertical;
+  -webkit-appearance:none;appearance:none;
+}
+textarea::placeholder,input::placeholder{color:#5F6B7A}
+textarea:focus,input:focus,select:focus{
+  outline:none;border-color:var(--ambar);
+  box-shadow:0 0 0 3px rgba(255,176,32,.13);
+}
+.primario{
+  background:var(--ambar);color:#1A1400;border:none;
+  padding:15px;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;width:100%;
+}
+.primario:disabled{background:#2A2E36;color:#6B7583;cursor:default}
+.secundario{
+  background:var(--panel);border:1px solid var(--linea);color:var(--texto);
+  padding:14px 22px;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;
+}
+.enlace{
+  background:none;border:none;color:var(--apagado);font-size:14px;
+  text-decoration:underline;cursor:pointer;padding:6px;
+}
+.formulario{display:flex;flex-direction:column;gap:15px}
+.campo{display:flex;flex-direction:column;gap:7px}
+.campo label{
+  font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--apagado);font-weight:600;padding-left:2px;
+}
+.fila{display:flex;gap:12px}
+.fila .campo{flex:1;min-width:0}
+.acciones{display:flex;gap:12px;margin-top:2px}
+.acciones .primario{flex:1;width:auto}
 .acciones .secundario{white-space:nowrap}
+
+/* pantalla nuevo: el cuadro de texto ocupa toda la pantalla disponible */
+.centro{display:flex;flex-direction:column;align-items:center;gap:16px}
+#v-nuevo{display:flex;flex-direction:column;padding-bottom:100px}
+#v-nuevo .campo{flex:1;min-height:0}
+#v-nuevo textarea{
+  flex:1;min-height:36vh;resize:none;
+  padding:16px;font-size:16.5px;line-height:1.65;
+}
 
 /* hoja de frases rápidas */
 .hoja{position:fixed;inset:0;z-index:55;background:rgba(6,9,13,.7);display:flex;align-items:flex-end}
 .hoja-caja{
   width:100%;max-width:520px;margin:0 auto;max-height:78vh;
   background:var(--panel);border-top:1px solid var(--linea);
-  border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+  border-radius:20px 20px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));
   display:flex;flex-direction:column;gap:12px;
 }
 .hoja-cab{display:flex;justify-content:space-between;align-items:center}
 .hoja-titulo{font-size:15px;font-weight:700}
 .hoja-lista{overflow-y:auto;display:flex;flex-direction:column;gap:8px}
 .frase{
-  background:var(--fondo);border:1px solid var(--linea);border-radius:10px;
-  padding:11px 13px;text-align:left;color:var(--texto);cursor:pointer;
+  background:var(--fondo);border:1px solid var(--linea);border-radius:12px;
+  padding:12px 14px;text-align:left;color:var(--texto);cursor:pointer;
   display:flex;flex-direction:column;gap:4px;width:100%;
 }
 .frase-lbl{font-size:14.5px;font-weight:600}
@@ -99,7 +141,7 @@ main{flex:1;padding:20px 18px 95px;overflow-y:auto}
 .historial{display:flex;flex-direction:column;gap:14px}
 .tarjeta{
   background:var(--panel);border:1px solid var(--linea);border-left:4px solid var(--ok);
-  border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;
+  border-radius:14px;padding:15px 16px;display:flex;flex-direction:column;gap:8px;
 }
 .tarjeta.incidencia{border-left-color:var(--rojo)}
 .tarjeta-cab{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -123,7 +165,7 @@ main{flex:1;padding:20px 18px 95px;overflow-y:auto}
 }
 .modal-caja{
   width:100%;max-width:340px;background:var(--panel);
-  border:1px solid var(--linea);border-radius:14px;padding:20px;
+  border:1px solid var(--linea);border-radius:18px;padding:22px;
   display:flex;flex-direction:column;gap:12px;
 }
 .modal-titulo{font-size:15px;font-weight:700}
@@ -191,7 +233,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <span class="chapa" aria-hidden="true"></span>
     <div>
       <h1>Parte de servicio</h1>
-      <p class="sub">Registro del turno · v3.3</p>
+      <p class="sub">Registro del turno · v3.4</p>
     </div>
   </div>
   <div class="estado">
@@ -226,9 +268,8 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
 
 <!-- NUEVO -->
 <main id="v-nuevo" class="formulario oculto">
-  <p class="guia" id="guiaNuevo">Escribe la novedad, o dicta con el micrófono del teclado. Las frases rápidas rellenan lo de siempre.</p>
   <div class="campo"><label>Registro del turno</label>
-    <textarea id="txtEntrada" rows="8" placeholder="Rondas, relevos, controles o incidencias…"></textarea></div>
+    <textarea id="txtEntrada" rows="8" placeholder="Rondas, relevos, controles o incidencias. Dicta con el micrófono del teclado o usa las frases rápidas."></textarea></div>
   <div class="acciones">
     <button class="secundario" id="btnFrases">Frases</button>
     <button class="primario" id="btnRedactar" disabled>Añadir al parte</button>
