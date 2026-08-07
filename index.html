@@ -223,7 +223,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <span class="chapa" aria-hidden="true"></span>
     <div>
       <h1>Parte de servicio</h1>
-      <p class="sub">Registro del turno · v2.9</p>
+      <p class="sub">Registro del turno · v3.0</p>
     </div>
   </div>
   <div class="estado">
@@ -240,7 +240,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
 <main id="v-turno" class="formulario oculto">
   <p class="guia">Datos del servicio. Se registran al inicio del turno y se añaden automáticamente a cada entrada.</p>
   <div class="campo"><label>Nombre del vigilante</label><input id="t-vigilante" placeholder="Nombre y apellidos"></div>
-  <div class="campo"><label>Nº de TIP</label><input id="t-tip" placeholder="Ej.: 113.436"></div>
+  <div class="campo"><label>Nº de TIP</label><input id="t-tip" inputmode="decimal" placeholder="Ej.: 113.436"></div>
   <div class="campo"><label>Servicio / puesto</label><input id="t-servicio" placeholder="Ej.: PALACIO BATLIA-SCALA"></div>
   <div class="campo"><label>Turno de trabajo</label><select id="t-turno"></select></div>
   <div class="fila">
@@ -295,8 +295,17 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
   <div class="util">
     <button class="mini" id="btnExportar">Copia de seguridad (JSON)</button>
     <button class="mini" id="btnImportar">Restaurar copia</button>
+    <button class="mini" id="btnArchivo">Turnos anteriores</button>
     <input type="file" id="fileImport" accept=".json" class="oculto">
   </div>
+</main>
+
+<!-- ARCHIVO -->
+<main id="v-archivo" class="historial oculto">
+  <p class="guia">Turnos cerrados. Se conservan en el móvil y se pueden exportar cuando haga falta.</p>
+  <div id="listaArchivo"></div>
+  <p class="guia oculto" id="archivoVacio">Todavía no has cerrado ningún turno.</p>
+  <div class="acciones"><button class="secundario" id="btnVolverHist">Volver al turno en curso</button></div>
 </main>
 
 <!-- INFORME -->
@@ -343,13 +352,17 @@ var PIN_PRUEBAS  = "6969";
 
 // ---------- estado ----------
 var TIPOS=["Intrusión","Hurto / robo","Daños","Salto de alarma","Emergencia / accidente","Control de accesos","Otros"];
-var turno=null, partes=[], pins={}, maestro=null;
+var turno=null, partes=[], archivo=[], pins={}, maestro=null;
+var informeSel=null;   // null = turno en curso; si no, índice del turno archivado
 var editId=null, escuchando=false, rec=null, horaCaptura="";
 
 function cargar(k,def){try{var v=localStorage.getItem(k);return v?JSON.parse(v):def}catch(e){return def}}
-function guardar(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){avisar("No se pudo guardar en el dispositivo.")}}
+function guardar(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){
+  alert("NO SE HA PODIDO GUARDAR EN EL MÓVIL.\n\nEl almacenamiento está lleno. Haz una copia de seguridad y elimina turnos antiguos desde \u00abTurnos anteriores\u00bb.");
+}}
 turno=cargar("ps_turno",null);
 partes=cargar("ps_partes",[]);
+archivo=cargar("ps_archivo",[]);
 pins=cargar("ps_pins",{});
 maestro=cargar("ps_maestro",null);
 
@@ -424,13 +437,14 @@ function conPermiso(p,cb){
 }
 
 // ---------- navegación ----------
-var VISTAS=["turno","nuevo","revisar","historial","informe"];
+var VISTAS=["turno","nuevo","revisar","historial","archivo","informe"];
 function ir(v){
   VISTAS.forEach(function(x){$("v-"+x).classList.toggle("oculto",x!==v)});
   $("navNuevo").classList.toggle("activo",v==="nuevo"||v==="revisar");
-  $("navHistorial").classList.toggle("activo",v==="historial"||v==="informe");
+  $("navHistorial").classList.toggle("activo",v==="historial"||v==="archivo"||v==="informe");
   avisar("");
   if(v==="historial")pintarHistorial();
+  if(v==="archivo")pintarArchivo();
   if(v==="informe")pintarInforme();
   if(v==="turno")pintarTurnoForm();
   pintarChip(v);
@@ -469,11 +483,21 @@ function pintarTurnoForm(){
 }
 $("btnCancelTurno").onclick=function(){ir("nuevo")};
 $("btnRelevo").onclick=function(){
-  if(!confirm("¿Cerrar el turno de "+turno.vigilante+" y dejar el móvil listo para el siguiente vigilante?\n\nLas entradas se conservan y quedarán protegidas con su PIN."))return;
-  turno=null;guardar("ps_turno",null);
+  if(!confirm("¿Cerrar el turno de "+turno.vigilante+" y dejar el móvil listo para el siguiente vigilante?\n\n"+
+    "Las "+partes.length+" entrada(s) de este turno pasan a \u00abTurnos anteriores\u00bb: se conservan y se pueden exportar, pero ya no se mezclan con el parte del siguiente vigilante."))return;
+  cerrarTurno();
   pintarTurnoForm();pintarChip("turno");
-  avisar("Turno cerrado. Introduce los datos del vigilante entrante.");
+  avisar("Turno cerrado y archivado. Introduce los datos del vigilante entrante.");
+  if(confirm("Turno archivado.\n\n¿Descargar ahora una copia de seguridad? Si alguien borra los datos del navegador, es lo único que permite recuperar los partes."))exportarJSON();
 };
+// Archiva el turno en curso con sus entradas y deja el parte en blanco.
+function cerrarTurno(){
+  if(!turno)return;
+  archivo.unshift({id:Date.now(),turno:turno,partes:partes});
+  guardar("ps_archivo",archivo);
+  partes=[];guardar("ps_partes",partes);
+  turno=null;guardar("ps_turno",null);
+}
 $("btnGuardarTurno").onclick=function(){
   var v=$("t-vigilante").value.trim(),p=$("t-tip").value.trim();
   if(!v||!p){avisar("Nombre del vigilante y nº de TIP son obligatorios.");return}
@@ -651,6 +675,7 @@ $("btnGuardarEntrada").onclick=function(){
   var texto=$("e-texto").value.trim();
   if(!texto){avisar("El texto no puede quedar vacío.");return}
   var e={hora:$("e-hora").value||ahora(),tipo:$("e-tipo").value,texto:texto};
+  if(!horaEnTurno(e.hora)&&!confirm("La hora "+e.hora+" queda fuera del horario del turno ("+turno.horaInicio+" a "+turno.horaFin+").\n\n¿Guardar de todas formas?"))return;
   if(editId){
     partes=partes.map(function(p){return p.id===editId?Object.assign({},p,e):p});
   }else{
@@ -716,6 +741,7 @@ function pintarHistorial(){
   $("btnInforme").classList.toggle("oculto",partes.length===0);
   $("vacio").classList.toggle("oculto",partes.length>0);
   $("navHistorial").textContent="Historial"+(partes.length?" ("+partes.length+")":"");
+  $("btnArchivo").textContent="Turnos anteriores"+(archivo.length?" ("+archivo.length+")":"");
   var miTip=turno?turno.tip:"";
   var h=partes.map(function(p){
     var ajena=p.tip&&p.tip!==miTip;
@@ -745,16 +771,49 @@ function pintarHistorial(){
     };
   });
 }
-$("btnInforme").onclick=function(){ir("informe")};
+$("btnInforme").onclick=function(){informeSel=null;ir("informe")};
+$("btnArchivo").onclick=function(){ir("archivo")};
+$("btnVolverHist").onclick=function(){ir("historial")};
+
+// ---------- turnos archivados ----------
+function pintarArchivo(){
+  $("archivoVacio").classList.toggle("oculto",archivo.length>0);
+  $("listaArchivo").innerHTML=archivo.map(function(a,i){
+    var t=a.turno||{};
+    var f=t.fecha?t.fecha.split("-").reverse().join("/"):"—";
+    return '<article class="tarjeta">'+
+      '<div class="tarjeta-cab"><span class="etiqueta ok">'+esc(t.turnoTrabajo||"TURNO")+'</span>'+
+      '<time>'+f+' · '+esc(t.horaInicio||"—")+'–'+esc(t.horaFin||"—")+'</time></div>'+
+      '<p class="texto">'+esc(t.servicio||"—")+'</p>'+
+      '<p class="autor">'+esc(t.vigilante||"—")+(t.tip?' · TIP '+esc(t.tip):'')+
+      ' · '+(a.partes?a.partes.length:0)+' entrada(s)</p>'+
+      '<div class="tarjeta-pie"><button class="mini" data-v="'+i+'">Ver parte</button>'+
+      '<button class="mini" data-b="'+i+'">Eliminar</button></div></article>';
+  }).join("");
+  $("listaArchivo").querySelectorAll("[data-v]").forEach(function(b){
+    b.onclick=function(){informeSel=+b.dataset.v;ir("informe")};
+  });
+  $("listaArchivo").querySelectorAll("[data-b]").forEach(function(b){
+    b.onclick=function(){
+      var i=+b.dataset.b;
+      pedirPin("PIN maestro","Eliminar un turno archivado no tiene vuelta atrás. Solo el jefe de equipo.",
+        esMaestro,function(){
+          if(!confirm("¿Eliminar definitivamente este turno archivado?"))return;
+          archivo.splice(i,1);guardar("ps_archivo",archivo);pintarArchivo();
+        });
+    };
+  });
+}
 
 // ---------- copia de seguridad JSON ----------
-$("btnExportar").onclick=function(){
-  var blob=new Blob([JSON.stringify({turno:turno,partes:partes,pins:pins,maestro:maestro},null,2)],{type:"application/json"});
+function exportarJSON(){
+  var blob=new Blob([JSON.stringify({turno:turno,partes:partes,archivo:archivo,pins:pins,maestro:maestro},null,2)],{type:"application/json"});
   var a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
   a.download="parte-servicio-"+new Date().toISOString().slice(0,10)+".json";
   a.click();
-};
+}
+$("btnExportar").onclick=exportarJSON;
 $("btnImportar").onclick=function(){
   pedirPin("PIN maestro","Restaurar una copia sustituye todo lo guardado en el móvil. Solo el jefe de equipo.",
     esMaestro,function(){$("fileImport").click()});
@@ -767,6 +826,7 @@ $("fileImport").onchange=function(ev){
       var d=JSON.parse(r.result);
       if(d.turno){turno=d.turno;guardar("ps_turno",turno)}
       if(Array.isArray(d.partes)){partes=d.partes;guardar("ps_partes",partes)}
+      if(Array.isArray(d.archivo)){archivo=d.archivo;guardar("ps_archivo",archivo)}
       if(d.pins){pins=d.pins;guardar("ps_pins",pins)}
       if(d.maestro){maestro=d.maestro;guardar("ps_maestro",maestro)}
       pintarHistorial();pintarChip("historial");
@@ -788,21 +848,48 @@ function fechaCorta(iso){
   var d=new Date(iso);
   return ("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+"/"+d.getFullYear();
 }
-// Entradas del vigilante que firma, en orden cronológico.
-function entradasDelParte(t){
-  return partes.filter(function(p){return !p.tip||p.tip===t.tip})
-               .sort(function(a,b){return a.id-b.id});
+// Minutos transcurridos desde el inicio del turno. Así un turno de noche
+// que cruza la medianoche se ordena bien: 23:00 va antes que 02:00.
+function minutosDeHora(x){var p=(x||"00:00").split(":");return (+p[0])*60+(+p[1])}
+function desdeInicio(t,hora){
+  if(!t.horaInicio)return null;
+  return (minutosDeHora(hora)-minutosDeHora(t.horaInicio)+1440)%1440;
+}
+function horaEnTurno(hora){
+  var t=turno||{};
+  if(!t.horaInicio||!t.horaFin)return true;
+  var dur=(minutosDeHora(t.horaFin)-minutosDeHora(t.horaInicio)+1440)%1440;
+  if(!dur)return true;
+  return desdeInicio(t,hora)<=dur;
+}
+// Entradas del vigilante que firma, ordenadas por la hora que llevan escrita
+// (no por el momento en que se teclearon).
+function entradasDelParte(t,lista){
+  return (lista||partes).filter(function(p){return !p.tip||p.tip===t.tip})
+    .slice()
+    .sort(function(a,b){
+      var ka=desdeInicio(t,a.hora), kb=desdeInicio(t,b.hora);
+      if(ka===null||kb===null)return a.id-b.id;
+      return ka-kb||a.id-b.id;
+    });
+}
+// De qué turno se está sacando el parte: el actual o uno archivado.
+function datosInforme(){
+  if(informeSel===null)return{t:turno||{},lista:partes};
+  var a=archivo[informeSel]||{};
+  return{t:a.turno||{},lista:a.partes||[]};
 }
 // La fecha del parte la fija el vigilante al iniciar turno (los turnos de
 // noche cruzan la medianoche). Si falta, se usa la del primer registro.
 function fechaDelParte(crono){
-  var t=turno||{};
+  var t=datosInforme().t;
   if(t.fecha){var x=t.fecha.split("-");return x[2]+"/"+x[1]+"/"+x[0]}
   return fechaCorta(crono.length?crono[0].fecha:new Date().toISOString());
 }
 function pintarInforme(){
-  var t=turno||{};
-  var crono=entradasDelParte(t);
+  var d=datosInforme();
+  var t=d.t;
+  var crono=entradasDelParte(t,d.lista);
   var h='<div class="inf-logos"><img src="'+LOGO_IZQ+'" alt="MED Seguridad">'+
         '<img class="dv" src="'+LOGO_DER+'" alt="Diputació de València"></div>'+
         '<p class="inf-banda">'+esc((t.servicio||"SERVICIO").toUpperCase())+'</p>'+
@@ -827,14 +914,15 @@ function pintarInforme(){
 }
 // Nombre que Chrome propondrá al guardar el PDF, con el formato del servicio.
 function nombreDelParte(){
-  var t=turno||{};
-  var crono=entradasDelParte(t);
+  var d=datosInforme();
+  var t=d.t;
+  var crono=entradasDelParte(t,d.lista);
   var f=fechaDelParte(crono).replace(/\//g,"-");
   var hi=(t.horaInicio||"00:00").replace(":","_");
   var hf=(t.horaFin||"00:00").replace(":","_");
   return f+" - PARTE DIARIO DE SERVICIO "+(t.servicio||"").toUpperCase()+" ("+hi+"H A "+hf+"H)";
 }
-$("btnVolver").onclick=function(){ir("historial")};
+$("btnVolver").onclick=function(){ir(informeSel===null?"historial":"archivo")};
 $("btnPDF").onclick=function(){
   var titulo=document.title;
   document.title=nombreDelParte();
