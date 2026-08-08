@@ -144,9 +144,11 @@ textarea:focus,input:focus,select:focus{
   border-radius:14px;padding:15px 16px;display:flex;flex-direction:column;gap:8px;
 }
 .tarjeta.incidencia{border-left-color:var(--rojo)}
+.tarjeta.atencion{border-left-color:var(--ambar)}
 .tarjeta-cab{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .etiqueta{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--rojo)}
 .etiqueta.ok{color:var(--ok)}
+.etiqueta.warn{color:var(--ambar)}
 .tarjeta-cab time{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--apagado)}
 .texto{font-size:14.5px;line-height:1.55}
 .autor{font-size:12px;color:var(--apagado);letter-spacing:.02em}
@@ -233,7 +235,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <span class="chapa" aria-hidden="true"></span>
     <div>
       <h1>Parte de servicio</h1>
-      <p class="sub">Registro del turno · v3.4</p>
+      <p class="sub">Registro del turno · v3.5</p>
     </div>
   </div>
   <div class="estado">
@@ -300,6 +302,7 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
     <button class="mini" id="btnExportar">Copia de seguridad (JSON)</button>
     <button class="mini" id="btnImportar">Restaurar copia</button>
     <button class="mini" id="btnArchivo">Turnos anteriores</button>
+    <button class="mini" id="btnDiag">Diagnóstico</button>
     <input type="file" id="fileImport" accept=".json" class="oculto">
   </div>
 </main>
@@ -310,6 +313,13 @@ nav button.activo{color:var(--ambar);border-top-color:var(--ambar)}
   <div id="listaArchivo"></div>
   <p class="guia oculto" id="archivoVacio">Todavía no has cerrado ningún turno.</p>
   <div class="acciones"><button class="secundario" id="btnVolverHist">Volver al turno en curso</button></div>
+</main>
+
+<!-- DIAGNÓSTICO -->
+<main id="v-diag" class="historial oculto">
+  <p class="guia">Estado del móvil y de los datos guardados. Sirve para comprobar que no se ha perdido nada.</p>
+  <div id="listaDiag"></div>
+  <div class="acciones"><button class="secundario" id="btnVolverDiag">Volver</button></div>
 </main>
 
 <!-- INFORME -->
@@ -373,14 +383,70 @@ var informeSel=null;   // null = turno en curso; si no, índice del turno archiv
 var editId=null, horaCaptura="";
 
 function cargar(k,def){try{var v=localStorage.getItem(k);return v?JSON.parse(v):def}catch(e){return def}}
-function guardar(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){
-  alert("NO SE HA PODIDO GUARDAR EN EL MÓVIL.\n\nEl almacenamiento está lleno. Haz una copia de seguridad y elimina turnos antiguos desde \u00abTurnos anteriores\u00bb.");
-}}
+
+// Escribe y vuelve a leer para comprobar que se ha guardado de verdad.
+// Devuelve true solo si el dato está en el móvil. Quien llame a esta
+// función NO debe dar nada por guardado si recibe false.
+function guardar(k,v){
+  var s;
+  try{s=JSON.stringify(v)}catch(e){
+    alert("NO SE HA PODIDO GUARDAR EN EL MÓVIL.\n\nEl dato no se ha podido preparar. Anota lo escrito en papel antes de cerrar la app.");
+    return false;
+  }
+  try{
+    localStorage.setItem(k,s);
+    if(localStorage.getItem(k)!==s)throw new Error("no coincide");
+    return true;
+  }catch(e){
+    alert("NO SE HA PODIDO GUARDAR EN EL MÓVIL.\n\nEl almacenamiento está lleno o el navegador lo ha bloqueado.\n\nNO des la entrada por guardada. Haz una copia de seguridad y elimina turnos antiguos desde \u00abTurnos anteriores\u00bb.");
+    return false;
+  }
+}
 turno=cargar("ps_turno",null);
 partes=cargar("ps_partes",[]);
 archivo=cargar("ps_archivo",[]);
 pins=cargar("ps_pins",{});
 maestro=cargar("ps_maestro",null);
+
+/* =========================================================
+   VERSIÓN DE LOS DATOS
+   No es la versión de la app: es la forma que tienen los datos
+   guardados. Si algún día cambia, aquí se sube el número y se
+   añade la conversión de la forma antigua a la nueva. Sin esto,
+   un móvil con datos viejos puede fallar de formas raras.
+   ========================================================= */
+var ESQUEMA=2;   // 1 = hasta v3.4 · 2 = desde v3.5 (borrado no destructivo)
+(function migrarDatos(){
+  var v=cargar("ps_version",1);
+  if(v===ESQUEMA)return;
+  if(v>ESQUEMA){
+    alert("AVISO\n\nEstos datos los guardó una versión más nueva de la app. Actualiza la app antes de seguir para no perder nada.");
+    return;
+  }
+  // de 1 a 2: no hay que convertir nada, las entradas sin marca se dan por vivas
+  guardar("ps_version",ESQUEMA);
+})();
+
+// Una entrada eliminada no se borra: se marca. Sigue en la copia de
+// seguridad, pero no aparece ni en el historial ni en el parte.
+function vivas(lista){
+  return (lista||partes).filter(function(p){return !p.borrada});
+}
+
+// El identificador era la hora del móvil. Dos entradas guardadas en el
+// mismo milisegundo compartirían id y editar una tocaría las dos.
+var ultimoId=0;
+(function(){
+  var todas=partes.slice();
+  archivo.forEach(function(a){todas=todas.concat(a.partes||[])});
+  todas.forEach(function(p){if(p&&p.id>ultimoId)ultimoId=p.id});
+})();
+function idUnico(){
+  var t=Date.now();
+  if(t<=ultimoId)t=ultimoId+1;
+  ultimoId=t;
+  return t;
+}
 
 // ---------- utilidades ----------
 function $(id){return document.getElementById(id)}
@@ -453,7 +519,7 @@ function conPermiso(p,cb){
 }
 
 // ---------- navegación ----------
-var VISTAS=["turno","nuevo","revisar","historial","archivo","informe"];
+var VISTAS=["turno","nuevo","revisar","historial","archivo","informe","diag"];
 function ir(v){
   VISTAS.forEach(function(x){$("v-"+x).classList.toggle("oculto",x!==v)});
   $("navNuevo").classList.toggle("activo",v==="nuevo"||v==="revisar");
@@ -462,6 +528,7 @@ function ir(v){
   if(v==="historial")pintarHistorial();
   if(v==="archivo")pintarArchivo();
   if(v==="informe")pintarInforme();
+  if(v==="diag")pintarDiag();
   if(v==="turno")pintarTurnoForm();
   pintarChip(v);
 }
@@ -500,17 +567,23 @@ function pintarTurnoForm(){
 $("btnCancelTurno").onclick=function(){ir("nuevo")};
 $("btnRelevo").onclick=function(){
   if(!confirm("¿Cerrar el turno de "+turno.vigilante+" y dejar el móvil listo para el siguiente vigilante?\n\n"+
-    "Las "+partes.length+" entrada(s) de este turno pasan a \u00abTurnos anteriores\u00bb: se conservan y se pueden exportar, pero ya no se mezclan con el parte del siguiente vigilante."))return;
-  cerrarTurno();
+    "Las "+vivas().length+" entrada(s) de este turno pasan a \u00abTurnos anteriores\u00bb: se conservan y se pueden exportar, pero ya no se mezclan con el parte del siguiente vigilante."))return;
+  if(!cerrarTurno())return;
   pintarTurnoForm();pintarChip("turno");
   avisar("Turno cerrado y archivado. Introduce los datos del vigilante entrante.");
   if(confirm("Turno archivado.\n\n¿Descargar ahora una copia de seguridad? Si alguien borra los datos del navegador, es lo único que permite recuperar los partes."))exportarJSON();
 };
 // Archiva el turno en curso con sus entradas y deja el parte en blanco.
 function cerrarTurno(){
-  if(!turno)return;
-  archivo.unshift({id:Date.now(),turno:turno,partes:partes});
-  guardar("ps_archivo",archivo);
+  if(!turno)return false;
+  // Primero se archiva y se comprueba que ha quedado escrito. Solo entonces
+  // se vacía el parte en curso: si el móvil no puede guardar, no se toca nada.
+  var nuevoArchivo=[{id:Date.now(),turno:turno,partes:partes,cerrado:new Date().toISOString()}].concat(archivo);
+  if(!guardar("ps_archivo",nuevoArchivo)){
+    alert("NO SE HA CERRADO EL TURNO.\n\nNo se ha podido archivar. No se ha borrado nada: las entradas siguen en el parte en curso.\n\nDescarga una copia de seguridad y libera espacio antes de volver a intentarlo.");
+    return false;
+  }
+  archivo=nuevoArchivo;
   partes=[];guardar("ps_partes",partes);
   turno=null;guardar("ps_turno",null);
   // Lo que el saliente dejó dictado a medias no puede aparecer en la
@@ -518,13 +591,15 @@ function cerrarTurno(){
   $("txtEntrada").value="";horaCaptura="";
   borrarBorrador();actualizarBtn();
   informeSel=null;
+  return true;
 }
 $("btnGuardarTurno").onclick=function(){
   var v=$("t-vigilante").value.trim(),p=$("t-tip").value.trim();
   if(!v||!p){avisar("Nombre del vigilante y nº de TIP son obligatorios.");return}
   var aplicar=function(){
-    turno={vigilante:v,tip:p,servicio:$("t-servicio").value.trim(),turnoTrabajo:$("t-turno").value,fecha:$("t-fecha").value||hoyISO(),horaInicio:$("t-inicio").value,horaFin:$("t-fin").value};
-    guardar("ps_turno",turno);
+    var nuevo={vigilante:v,tip:p,servicio:$("t-servicio").value.trim(),turnoTrabajo:$("t-turno").value,fecha:$("t-fecha").value||hoyISO(),horaInicio:$("t-inicio").value,horaFin:$("t-fin").value};
+    if(!guardar("ps_turno",nuevo)){avisar("No se han podido guardar los datos del turno. Libera espacio en el móvil antes de seguir.");return}
+    turno=nuevo;
     ir("nuevo");
   };
   // Cambiar el TIP es un relevo aunque no se haya pulsado el botón: hay que
@@ -532,8 +607,8 @@ $("btnGuardarTurno").onclick=function(){
   var entrar=function(){
     if(turno&&turno.tip!==p){
       if(!confirm("El turno abierto es de "+turno.vigilante+" (TIP "+turno.tip+").\n\n"+
-        "Al cambiar el TIP se cerrará su turno y sus "+partes.length+" entrada(s) se archivarán a su nombre. ¿Continuar?"))return;
-      cerrarTurno();
+        "Al cambiar el TIP se cerrará su turno y sus "+vivas().length+" entrada(s) se archivarán a su nombre. ¿Continuar?"))return;
+      if(!cerrarTurno())return;
     }
     aplicar();
   };
@@ -673,14 +748,22 @@ $("btnGuardarEntrada").onclick=function(){
   var texto=$("e-texto").value.trim();
   if(!texto){avisar("El texto no puede quedar vacío.");return}
   var e={hora:$("e-hora").value||ahora(),tipo:$("e-tipo").value,texto:texto};
+  if(!turno){avisar("No hay ningún turno abierto. Introduce los datos del servicio antes de registrar entradas.");return}
   if(!horaEnTurno(e.hora)&&!confirm("La hora "+e.hora+" queda fuera del horario del turno ("+turno.horaInicio+" a "+turno.horaFin+").\n\n¿Guardar de todas formas?"))return;
+  // Se prepara la lista nueva aparte. Hasta que el móvil no confirma que
+  // la ha guardado, la lista buena sigue siendo la de antes.
+  var nuevos;
   if(editId){
-    partes=partes.map(function(p){return p.id===editId?Object.assign({},p,e):p});
+    nuevos=partes.map(function(p){return p.id===editId?Object.assign({},p,e):p});
   }else{
-    partes.unshift(Object.assign({id:Date.now(),fecha:new Date().toISOString(),vigilante:turno.vigilante,tip:turno.tip,servicio:turno.servicio},e));
+    nuevos=[Object.assign({id:idUnico(),fecha:new Date().toISOString(),vigilante:turno.vigilante,tip:turno.tip,servicio:turno.servicio},e)].concat(partes);
   }
+  if(!guardar("ps_partes",nuevos)){
+    avisar("LA ENTRADA NO SE HA GUARDADO. No cierres la app: copia el texto a otro sitio y libera espacio.");
+    return;   // se queda en la pantalla de revisión, con el texto delante
+  }
+  partes=nuevos;
   editId=null;
-  guardar("ps_partes",partes);
   ir("historial");
 };
 
@@ -708,8 +791,16 @@ function limpiarEspaciado(txt){
     t=t.replace(/([,;])(?=[A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/g,function(m,g){n.tras++;return g+" "});
     /* falta espacio tras : solo entre letras (no rompe 09:15h) */
     t=t.replace(/([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]):(?=[A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/g,function(m,g){n.tras++;return g+": "});
-    /* falta espacio tras punto solo si sigue mayúscula (no rompe 09.15h, dival.es, nº5.) */
-    t=t.replace(/([A-Za-zÁÉÍÓÚÜÑáéíóúüñ])\.(?=[A-ZÁÉÍÓÚÑ])/g,function(m,g){n.tras++;return g+". "});
+    /* falta espacio tras punto solo si sigue mayúscula (no rompe 09.15h, dival.es, nº5.)
+       y nunca dentro de una sigla: T.I.P., V.S, C.C.T.V. se dejan como están.
+       Se reconoce la sigla porque la letra de delante del punto va sola:
+       la precede el principio de la línea, un espacio o otro punto. */
+    t=t.replace(/([0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ])\.(?=[A-ZÁÉÍÓÚÑ])/g,function(m,g,pos,todo){
+      var previa=pos>0?todo.charAt(pos-1):"";
+      var esSigla=/[A-ZÁÉÍÓÚÑ]/.test(g)&&(pos===0||previa===" "||previa==="."||previa==="\t");
+      if(esSigla)return m;
+      n.tras++;return g+". ";
+    });
     /* espacios pegados por dentro de los paréntesis */
     t=t.replace(/\( +/g,function(){n.parent++;return "("});
     t=t.replace(/ +\)/g,function(){n.parent++;return ")"});
@@ -735,19 +826,29 @@ $("btnCorregir").onclick=function(){
 };
 
 // ---------- historial ----------
-function pintarHistorial(){
-  $("btnInforme").classList.toggle("oculto",partes.length===0);
-  $("vacio").classList.toggle("oculto",partes.length>0);
-  $("navHistorial").textContent="Historial"+(partes.length?" ("+partes.length+")":"");
-  $("btnArchivo").textContent="Turnos anteriores"+(archivo.length?" ("+archivo.length+")":"");
+// Entradas del parte en curso que NO saldrán en el PDF porque las firmó
+// otro TIP. Antes desaparecían del informe sin decir nada.
+function ajenasAlParte(){
   var miTip=turno?turno.tip:"";
-  var h=partes.map(function(p){
+  return vivas().filter(function(p){return p.tip&&p.tip!==miTip});
+}
+function pintarHistorial(){
+  var lista=vivas();
+  $("btnInforme").classList.toggle("oculto",lista.length===0);
+  $("vacio").classList.toggle("oculto",lista.length>0);
+  $("navHistorial").textContent="Historial"+(lista.length?" ("+lista.length+")":"");
+  $("btnArchivo").textContent="Turnos anteriores"+(archivo.length?" ("+archivo.length+")":"");
+  var fuera=ajenasAlParte().length;
+  if(fuera)avisar(fuera+" entrada(s) las firmó otro TIP y NO saldrán en este parte. Se exportan desde el turno de su autor.");
+  var miTip=turno?turno.tip:"";
+  var h=lista.map(function(p){
     var ajena=p.tip&&p.tip!==miTip;
     return '<article class="tarjeta'+(p.tipo?' incidencia':'')+'">'+
       '<div class="tarjeta-cab"><span class="etiqueta'+(p.tipo?'':' ok')+'">'+esc(p.tipo||"Registro")+'</span>'+
       '<time>'+fechaLarga(p.fecha)+' · '+esc(p.hora)+'</time></div>'+
       '<p class="texto">'+esc(p.texto)+'</p>'+
-      '<p class="autor'+(ajena?' ajena':'')+'">'+(ajena?'🔒 ':'')+esc(p.vigilante||"—")+(p.tip?' · TIP '+esc(p.tip):'')+'</p>'+
+      '<p class="autor'+(ajena?' ajena':'')+'">'+(ajena?'🔒 ':'')+esc(p.vigilante||"—")+(p.tip?' · TIP '+esc(p.tip):'')+
+      (ajena?' · no sale en este parte':'')+'</p>'+
       '<div class="tarjeta-pie"><button class="mini" data-e="'+p.id+'">Editar</button>'+
       '<button class="mini" data-x="'+p.id+'">Eliminar</button></div></article>';
   }).join("");
@@ -762,16 +863,25 @@ function pintarHistorial(){
     b.onclick=function(){
       var p=partes.find(function(x){return x.id==b.dataset.x});
       conPermiso(p,function(){
-        if(!confirm("¿Eliminar esta entrada del parte?"))return;
-        partes=partes.filter(function(x){return x.id!=p.id});
-        guardar("ps_partes",partes);pintarHistorial();
+        if(!confirm("¿Eliminar esta entrada del parte?\n\nDeja de salir en el historial y en el PDF, pero se conserva dentro de la copia de seguridad por si hubiera que recuperarla."))return;
+        var nuevos=partes.map(function(x){
+          return x.id==p.id?Object.assign({},x,{borrada:true,borradaEl:new Date().toISOString()}):x;
+        });
+        if(!guardar("ps_partes",nuevos)){avisar("No se ha podido eliminar: el móvil no ha guardado el cambio.");return}
+        partes=nuevos;pintarHistorial();
       });
     };
   });
 }
-$("btnInforme").onclick=function(){informeSel=null;ir("informe")};
+$("btnInforme").onclick=function(){
+  var fuera=ajenasAlParte().length;
+  if(fuera&&!confirm(fuera+" entrada(s) de este historial las firmó otro TIP y NO aparecerán en el PDF.\n\n¿Exportar el parte igualmente?"))return;
+  informeSel=null;ir("informe");
+};
 $("btnArchivo").onclick=function(){ir("archivo")};
 $("btnVolverHist").onclick=function(){ir("historial")};
+$("btnDiag").onclick=function(){ir("diag")};
+$("btnVolverDiag").onclick=function(){ir("historial")};
 
 // ---------- turnos archivados ----------
 function pintarArchivo(){
@@ -784,7 +894,7 @@ function pintarArchivo(){
       '<time>'+f+' · '+esc(t.horaInicio||"—")+'–'+esc(t.horaFin||"—")+'</time></div>'+
       '<p class="texto">'+esc(t.servicio||"—")+'</p>'+
       '<p class="autor">'+esc(t.vigilante||"—")+(t.tip?' · TIP '+esc(t.tip):'')+
-      ' · '+(a.partes?a.partes.length:0)+' entrada(s)</p>'+
+      ' · '+vivas(a.partes||[]).length+' entrada(s)</p>'+
       '<div class="tarjeta-pie"><button class="mini" data-v="'+i+'">Ver parte</button>'+
       '<button class="mini" data-b="'+i+'">Eliminar</button></div></article>';
   }).join("");
@@ -803,13 +913,110 @@ function pintarArchivo(){
   });
 }
 
+// ---------- diagnóstico ----------
+// Comprueba el estado de los datos guardados sin tocar nada. Sirve para
+// verificar un móvil de servicio sin tener que mirar el código.
+function espacioUsadoKB(){
+  var chars=0;
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);
+      chars+=k.length+(localStorage.getItem(k)||"").length;
+    }
+  }catch(e){}
+  return Math.round(chars*2/1024);   // el navegador cuenta 2 bytes por carácter
+}
+function pintarDiag(){
+  var f=[];
+  function add(nivel,titulo,detalle){f.push({n:nivel,t:titulo,d:detalle})}
+
+  var kb=espacioUsadoKB(), pct=Math.round(kb/5120*100);
+  add(pct>75?"mal":(pct>50?"atencion":"ok"),"Espacio ocupado",
+    kb+" KB, en torno al "+pct+"% del hueco habitual de un navegador (5 MB). "+
+    (pct>50?"Conviene descargar una copia y eliminar turnos antiguos.":"Margen de sobra."));
+
+  var uc=cargar("ps_ultimaCopia",null);
+  if(!uc)add("mal","Copia de seguridad","Nunca se ha descargado una copia desde este móvil. Si alguien borra los datos del navegador, no hay forma de recuperar los partes.");
+  else{
+    var dias=Math.floor((Date.now()-new Date(uc).getTime())/86400000);
+    add(dias>7?"atencion":"ok","Copia de seguridad",
+      "Última: "+fechaCorta(uc)+" ("+(dias<=0?"hoy":"hace "+dias+" día(s)")+").");
+  }
+
+  var fuera=ajenasAlParte();
+  add(fuera.length?"mal":"ok","Entradas fuera del parte",
+    fuera.length?fuera.length+" entrada(s) las firmó otro TIP: se ven en el historial pero NO salen en el PDF de este turno."
+                :"Todas las entradas del historial saldrán en el parte.");
+
+  var raras=vivas().filter(function(p){return !horaEnTurno(p.hora)});
+  add(raras.length?"atencion":"ok","Horas fuera del turno",
+    raras.length?raras.length+" entrada(s) con hora fuera de "+(turno?(turno.horaInicio||"—")+"–"+(turno.horaFin||"—"):"el horario")+". Revísalas antes de exportar."
+                :"Todas las horas caen dentro del turno.");
+
+  var borradas=partes.filter(function(p){return p.borrada}).length;
+  add("ok","Entradas eliminadas",
+    borradas?borradas+" entrada(s) eliminadas en este turno. No salen en el parte, pero siguen dentro de la copia de seguridad."
+            :"Ninguna entrada eliminada en el turno en curso.");
+
+  var tot=0;archivo.forEach(function(a){tot+=vivas(a.partes||[]).length});
+  add("ok","Turnos anteriores",archivo.length+" turno(s) archivado(s) · "+tot+" entrada(s) en total.");
+
+  var b=cargar("ps_borrador",null);
+  add(b&&b.texto?"atencion":"ok","Entrada a medias",
+    b&&b.texto?"Hay texto escrito sin añadir al parte, capturado a las "+(b.hora||"—")+"."
+              :"No queda nada pendiente en el cuadro de texto.");
+
+  if(MODO_PRUEBAS)add("atencion","Modo pruebas",
+    "Activo: el PIN "+PIN_PRUEBAS+" abre cualquier cosa. Hay que desactivarlo antes de usar la app en un servicio real.");
+
+  var sw=("serviceWorker" in navigator);
+  add(sw?"ok":"atencion","Funciona sin cobertura",
+    sw?"El navegador guarda una copia de la app. Para comprobarlo de verdad: modo avión y abrir la app."
+      :"Este navegador no guarda copia de la app: sin cobertura puede no abrir.");
+
+  add("ok","Versión","App v3.5 · formato de datos v"+ESQUEMA+".");
+
+  $("listaDiag").innerHTML=f.map(function(x){
+    return '<article class="tarjeta'+(x.n==="mal"?" incidencia":(x.n==="atencion"?" atencion":""))+'">'+
+      '<div class="tarjeta-cab"><span class="etiqueta '+(x.n==="mal"?"":(x.n==="atencion"?"warn":"ok"))+'">'+esc(x.t)+'</span></div>'+
+      '<p class="texto">'+esc(x.d)+'</p></article>';
+  }).join("");
+
+  // este dato lo da el navegador con retraso, así que se añade al final
+  if(navigator.storage&&navigator.storage.persisted){
+    navigator.storage.persisted().then(function(ok){
+      if($("v-diag").classList.contains("oculto"))return;
+      $("listaDiag").insertAdjacentHTML("beforeend",
+        '<article class="tarjeta'+(ok?"":" atencion")+'"><div class="tarjeta-cab">'+
+        '<span class="etiqueta '+(ok?"ok":"warn")+'">Protección frente a borrados</span></div><p class="texto">'+
+        (ok?"Android no borrará los partes por su cuenta aunque el móvil se quede sin espacio."
+           :"Android podría borrar los partes si el móvil se queda corto de espacio. Descarga copias con más frecuencia.")+
+        '</p></article>');
+    }).catch(function(){});
+  }
+}
+
 // ---------- copia de seguridad JSON ----------
 function exportarJSON(){
-  var blob=new Blob([JSON.stringify({turno:turno,partes:partes,archivo:archivo,pins:pins,maestro:maestro},null,2)],{type:"application/json"});
-  var a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="parte-servicio-"+new Date().toISOString().slice(0,10)+".json";
-  a.click();
+  var datos={version:ESQUEMA,copiaDe:new Date().toISOString(),
+    turno:turno,partes:partes,archivo:archivo,pins:pins,maestro:maestro};
+  try{
+    var blob=new Blob([JSON.stringify(datos,null,2)],{type:"application/json"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");
+    a.href=url;
+    a.download="parte-servicio-"+new Date().toISOString().slice(0,10)+".json";
+    a.click();
+    setTimeout(function(){URL.revokeObjectURL(url)},4000);
+  }catch(e){
+    alert("NO SE HA PODIDO CREAR LA COPIA DE SEGURIDAD.\n\nNo cierres la app ni borres nada. Inténtalo desde Chrome, no desde el acceso directo.");
+    return false;
+  }
+  // Queda anotado el intento. Si el vigilante cancela la descarga en el
+  // móvil, el diagnóstico dirá que hay copia sin haberla. Es un recordatorio,
+  // no una garantía: la garantía es el archivo en el móvil.
+  guardar("ps_ultimaCopia",datos.copiaDe);
+  return true;
 }
 $("btnExportar").onclick=exportarJSON;
 $("btnImportar").onclick=function(){
@@ -822,13 +1029,18 @@ $("fileImport").onchange=function(ev){
   r.onload=function(){
     try{
       var d=JSON.parse(r.result);
+      var vc=d.version||1;
+      if(vc>ESQUEMA){avisar("La copia la hizo una versión más nueva de la app. Actualiza la app antes de restaurar.");return}
+      if(!confirm("Vas a sustituir TODO lo que hay en este móvil por el contenido de la copia"+
+        (d.copiaDe?" del "+fechaCorta(d.copiaDe):"")+".\n\nLo que haya ahora sin copia se pierde. ¿Continuar?"))return;
       if(d.turno){turno=d.turno;guardar("ps_turno",turno)}
       if(Array.isArray(d.partes)){partes=d.partes;guardar("ps_partes",partes)}
       if(Array.isArray(d.archivo)){archivo=d.archivo;guardar("ps_archivo",archivo)}
       if(d.pins){pins=d.pins;guardar("ps_pins",pins)}
       if(d.maestro){maestro=d.maestro;guardar("ps_maestro",maestro)}
+      guardar("ps_version",ESQUEMA);
       pintarHistorial();pintarChip("historial");
-      avisar("Copia restaurada.");
+      avisar("Copia restaurada"+(d.copiaDe?" (del "+fechaCorta(d.copiaDe)+")":"")+".");
     }catch(e){avisar("El archivo no es una copia válida.")}
   };
   r.readAsText(f);
@@ -863,7 +1075,7 @@ function horaEnTurno(hora){
 // Entradas del vigilante que firma, ordenadas por la hora que llevan escrita
 // (no por el momento en que se teclearon).
 function entradasDelParte(t,lista){
-  return (lista||partes).filter(function(p){return !p.tip||p.tip===t.tip})
+  return vivas(lista).filter(function(p){return !p.tip||p.tip===t.tip})
     .slice()
     .sort(function(a,b){
       var na=esNotaFija(a)?1:0, nb=esNotaFija(b)?1:0;
